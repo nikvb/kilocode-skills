@@ -1,117 +1,197 @@
 ---
 name: build-vercel-clone-site
 description: |
-  Build and deploy production-quality niche websites — directories, lead-gen sites,
-  expired-domain revivals, hotels, camps, restaurants, SaaS — to the hosted vercel-clone
-  platform at https://deploy.21mv.com. Each deploy lands on a {subdomain}.21mv.com URL
-  with its own Postgres + host networking + nginx vhost. Stack: SvelteKit 2 + Svelte 4
-  + Tailwind v4 + lucide-svelte + Postgres + Ollama (gemma2:2b) for chatbots. Apps DO
-  NOT send mail directly — they call the platform's mediated POST /api/v1/mail/send
-  endpoint with their dp_… deploy key, and the platform forwards through its own 3ava
-  account on their behalf using a verified sender domain (21mv.com / 3ava.com / etc.).
-  Use whenever someone asks to "build a website", "deploy on the platform", "revive a
-  domain", "add a CRM", or "add a chatbot".
+  Build a real website with one prompt — restaurants, sports teams, school clubs,
+  portfolios, photographers, online stores, local businesses, directories,
+  expired-domain revivals, anything. Designed for kids and beginners using
+  kilocode with FREE models (Qwen, DeepSeek, Gemini Flash, local Llama). The
+  skill walks the model through a step-by-step build of a SvelteKit + Tailwind
+  v4 site, then deploys it to https://deploy.21mv.com — the kid only needs ONE
+  API key (their dp_… deploy key) to get a live URL at {their-name}.21mv.com.
+  No server, no email setup, no DNS — the platform handles everything.
 trigger: |
-  - User mentions building/deploying a new site
-  - User wants to use the platform (POST /api/v1/deploy)
-  - User asks for a directory / lead-gen / revival site in any niche
-  - User mentions adding a chatbot or transactional email to a site
-  - User is editing ~/your-projects/<project>/ for a SvelteKit app to deploy
+  - User wants to build a website (any kind: restaurant, blog, portfolio, store,
+    directory, team page, school project, fan site, landing page, anything)
+  - User mentions deploying on 21mv.com / the platform / "the deploy server"
+  - User asks to revive an expired domain
+  - User asks to add a chatbot, contact form, or email notifications
+  - User is editing a SvelteKit project they want to put online
 when_to_skip: |
-  - User wants frontend work that won't be deployed on this platform (e.g. a Vite SPA going to GitHub Pages)
+  - User wants frontend work that won't be deployed on this platform (e.g. a static
+    Vite SPA going to GitHub Pages, a Next.js app going to Vercel)
   - User is only asking general programming questions
-  - User wants to set up their OWN platform (not use this hosted one) — see the README for that path
+  - User wants a complex backend or app that doesn't fit SvelteKit + Postgres
 required_secrets:
-  - PLATFORM_API_KEY     # bearer token for deploy.21mv.com — prefix dp_… — ASK USER if not provided
+  - PLATFORM_API_KEY     # the dp_… deploy key from https://deploy.21mv.com/dashboard/keys
+                         # ASK USER if not provided; never hardcode in source
                          # this same key authenticates BOTH /api/v1/deploy AND /api/v1/mail/send
-                         # the platform owns the 3ava mail key + verified sender domains; clients never see them
-                         # DATABASE_URL is auto-injected per-app; OLLAMA is at 127.0.0.1:11434 on host
+                         # the platform owns the mail key + verified sender domains;
+                         # clients never see them. DATABASE_URL is auto-injected per-app;
+                         # OLLAMA is at 127.0.0.1:11434 on the host
 ---
 
-# Build & deploy a niche site on the vercel-clone platform
+# Build any website with one prompt — kid-friendly edition
 
-This skill captures the entire end-to-end pattern for building a production-quality
-niche directory or revival site and deploying it on the user's self-hosted vercel-clone
-platform. It also documents the bugs we hit and the workarounds.
+A skill for AI assistants (kilocode, Claude Code, Cursor, with any free or paid
+model) that builds and deploys a real website on the hosted vercel-clone
+platform at `https://deploy.21mv.com`. Designed so a 12-year-old can say
+*"build me a site for my soccer team"* and walk away with a live URL.
 
-## When you start a session
+The skill works in two modes:
+- **Sequential**: one model, one step at a time. Works with cheap/free models
+  like Qwen 2.5, DeepSeek-V2.5, Gemini Flash, local Llama 3.1 70B.
+- **Parallel** (upgrade): if your tool supports `Agent` calls (Claude Code's
+  `Task` tool), spawn multiple sub-agents at once. ~3-5× faster but optional.
 
-If the user asks for any of the things in `trigger` above, take these steps in order:
+---
 
-1. **Ask for the API keys you don't have.** This skill never hardcodes keys. Always:
-   - Ask for `PLATFORM_API_KEY` (the `dp_…` token for `deploy.21mv.com`) before any deploy.
-   - SSH host defaults to `root@152.53.194.247`. Confirm if user mentions a different host.
-2. **Read user memory** — `~/.claude/projects/<project>/memory/MEMORY.md` for cross-session
-   context (Resend-clone existence, domain portfolio, prior project state).
-3. **Confirm the niche + scope** with one round of `AskUserQuestion`:
-   - Domain to target (must NOT be `amdy.io` — that's production for AMD servers).
-   - Brand name (the site's display name; does NOT need to match the URL).
-   - Catalog / content size for MVP.
-   - Listing depth (minimal / standard / rich).
-4. **Pick a brand palette + type** distinct from any sibling sites you've already built
-   on the user's platform. Check existing sites first: `https://campscout.21mv.com`
-   (pine + sun), `https://areghotel.21mv.com` (oxblood + sun-gold). Don't duplicate.
+## The 60-second pitch
 
-## Hard rules (NEVER violate)
+The kid types ONE prompt. The AI:
 
-- **`amdy.io` is production for AMD servers. Do not deploy to it, touch its DNS, or use it
-  as a test target.** The codebase has historical `amdy.io` defaults — they are wrong.
-  Always set `BASE_DOMAIN=21mv.com` (or another non-amdy domain).
-- **Never hardcode API keys in source.** Apps store their own `PLATFORM_API_KEY` (the dp_… deploy key) — that single key is also the auth for the platform mail proxy.
-  The `mail.ts` abstraction in `src/lib/server/mail.ts` is gated on env vars and
-  silently no-ops if missing.
-- **Never echo a secret back to the user** in a final message. Acknowledge receipt,
-  use it, and persist only on the server (in the platform's `/opt/deploy-platform/.env`).
-- **Don't deploy without a body-size limit fix in place.** SvelteKit's default 512 KB
-  rejects every real tarball. Platform `.env` must have `BODY_SIZE_LIMIT=10485760`.
+1. Asks them 5 short questions about what they want
+2. Picks a design palette + fonts that fit their answer
+3. Builds a SvelteKit + Tailwind v4 site (about 25 files)
+4. Tars it up
+5. POSTs to `https://deploy.21mv.com/api/v1/deploy`
+6. Returns the live URL: `https://{theirpick}.21mv.com`
 
-## Architecture you're building on
+Total time: ~10–15 minutes with a free model, ~3–5 minutes with parallel agents.
+
+---
+
+## STEP 1 — The 5-minute first conversation
+
+Before writing a single line of code, ask the kid these five questions in order.
+Use AskUserQuestion (or just plain text in tools that don't have it). **Do not skip**
+— the answers are what makes the site theirs and not generic AI slop.
+
+1. **"What's the site for?"** — pick an industry from the list below, or describe
+   it in a sentence. (Restaurant, sports team, school club, portfolio, online
+   store, blog, photographer, hotel, charity, event, directory, fan site, …)
+
+2. **"Who's it for?"** — pick the main audience. (Parents, classmates, fans,
+   customers, people in my city, anyone on the internet, …) Keeps tone right.
+
+3. **"What 3 things do you want visitors to do?"** — pick the top 3 actions:
+   `book a table`, `email me`, `read my posts`, `buy a thing`, `find a class`,
+   `download my résumé`, `watch a video`, `donate`, `RSVP`, `subscribe`, etc.
+   Each becomes a CTA on the site.
+
+4. **"What's the vibe?"** — pick 2–3 words: `playful, bright, friendly` /
+   `professional, calm, modern` / `cozy, warm, handmade` / `bold, edgy, loud` /
+   `quiet, premium, refined` / `nature, earthy, outdoor` / `retro, 80s, neon`.
+   This drives the palette.
+
+5. **"What's the URL name?"** — they pick the subdomain. Letters and dashes only,
+   3–63 chars. Examples: `tigers-soccer`, `sams-bakery`, `mias-art`, `coachmike`.
+   The site lives at `https://{their-pick}.21mv.com`.
+
+After they answer, **also ask for any specifics they want included**:
+
+- Specific images (hand them URLs or paths)
+- Specific text (a paragraph they wrote, a quote, an "about me")
+- Specific colors (their team colors, school colors, an existing logo color)
+- Specific contact info (their email, their phone, their school's address)
+- Anything off-limits (no testimonials, no chatbot, no signup form, …)
+
+These go into a section called **"What the kid told us"** in your build notes,
+and you reference it on every page.
+
+---
+
+## STEP 2 — Pick an industry template
+
+Match their answer to one of these patterns. Each gives a default IA, voice, and
+palette starter. **You can mix-and-match** — most real sites are hybrids.
+
+| Industry / use case | Default routes | Voice | Palette starter |
+|---|---|---|---|
+| **Restaurant / café / bakery** | `/`, `/menu`, `/visit`, `/reserve`, `/about` | warm, sensory, food-forward | terracotta + cream + leaf-green |
+| **Sports team / club** | `/`, `/schedule`, `/roster`, `/news`, `/join` | energetic, proud, local | team-color primary + chalk-white + scoreboard-dark |
+| **School club / class project** | `/`, `/about`, `/projects`, `/members`, `/contact` | clear, friendly, concise | one bold accent + neutrals |
+| **Personal portfolio / résumé** | `/`, `/work`, `/about`, `/writing`, `/contact` | confident, quiet, editorial | one signature color + paper-white + ink |
+| **Photographer / videographer** | `/`, `/galleries`, `/galleries/[slug]`, `/about`, `/book` | image-led, minimal text | full-bleed black/white + accent |
+| **Tutor / coach / lessons** | `/`, `/services`, `/rates`, `/testimonials`, `/book` | encouraging, expert, parent-friendly | trust-blue + warm cream + accent |
+| **Online store (≤30 products)** | `/`, `/shop`, `/shop/[slug]`, `/cart`, `/about` | direct, product-led | brand color + product-neutral |
+| **Blog / newsletter** | `/`, `/posts`, `/posts/[slug]`, `/about`, `/subscribe` | thoughtful, editorial | serif heavy, single accent |
+| **Hotel / B&B / vacation rental** | `/`, `/rooms`, `/rooms/[slug]`, `/visit`, `/book` | quiet, premium, place-specific | local stone/wood tones |
+| **Charity / nonprofit** | `/`, `/mission`, `/programs`, `/stories`, `/donate` | warm, plainspoken, hopeful | mission-driven primary + warm neutrals |
+| **Directory / lead-gen** | `/`, `/{cat}`, `/{cat}/[slug]`, `/search`, `/list-your-X`, `/admin` | informative, scout-like, parent-trusted | depth-color + signal-yellow |
+| **Event landing (party, wedding, festival)** | `/`, `/details`, `/rsvp`, `/photos`, `/faq` | celebratory, specific, single-purpose | event-color theme |
+| **Fan site / hobby community** | `/`, `/fav`, `/posts`, `/links`, `/about` | enthusiastic, personal, niche-specific | playful, saturated |
+| **Expired-domain revival** | depends on what archive.org shows | match the original tone | derived from old logo / old palette |
+
+If their answer doesn't fit any of these cleanly, pick the **closest** + tell
+them you're starting from that template and they can correct.
+
+---
+
+## STEP 3 — Pick a palette + type pairing
+
+The look is half the work. Don't default to the same beige-and-blue every time.
+
+**Picking a palette (8 colors)** — derived from the kid's vibe answer:
 
 ```
-   ┌────────────────────────────────────────────┐
-   │  Cloudflare (proxied DNS, free tier)       │
-   │  - 21mv.com zone (your wildcard target)    │
-   │  - 3ava.com (mail), other portfolio zones  │
-   └──────────────────┬─────────────────────────┘
-                      │ HTTPS
-   ┌──────────────────┴─────────────────────────┐
-   │  152.53.194.247 (Netcup VPS)               │
-   │  ┌─────────────────────────────────────┐   │
-   │  │  nginx (host) — vhost per deploy    │   │
-   │  └────────┬────────────────────────────┘   │
-   │           │ proxy_pass http://127.0.0.1:N  │
-   │  ┌────────┴────────┐  ┌─────────────────┐  │
-   │  │ deploy-platform │  │ deploy-<sub>    │  │
-   │  │ :3000 (systemd) │  │ :10001..N (host │  │
-   │  │ vercel-clone    │  │   networked     │  │
-   │  │   - hooks.ts    │  │   Docker)       │  │
-   │  │   - deployer.ts │  └────────┬────────┘  │
-   │  └────────┬────────┘           │            │
-   │           │ DATABASE_URL       │            │
-   │  ┌────────┴───────────────────┴──┐         │
-   │  │  PostgreSQL 16                 │         │
-   │  │  - deployplatform (platform)   │         │
-   │  │  - app_<id> (per deployment)   │         │
-   │  └────────────────────────────────┘         │
-   │                                             │
-   │  ┌─────────────────────┐                    │
-   │  │ Ollama (native)     │                    │
-   │  │ 127.0.0.1:11434     │                    │
-   │  │ - gemma2:2b (chat)  │                    │
-   │  │ - gemma4:e4b (idle) │                    │
-   │  └─────────────────────┘                    │
-   └─────────────────────────────────────────────┘
+--color-ink            #1A1A17   /* near-black warm text */
+--color-paper          #FFFFFF   /* card / elevated surface */
+--color-bg             <pick>    /* primary page bg — warm or cool? */
+--color-surface        <pick>    /* secondary bg, slightly different from --bg */
+--color-primary        <pick>    /* the brand main color — chosen from vibe */
+--color-accent         <pick>    /* hover, CTA hover, single highlights */
+--color-muted          <pick>    /* text that's secondary, borders, chrome */
+--color-pop            <pick>    /* rarely used; price, alerts, decorative */
 ```
 
-The platform deploys ONLY to subdomains under its `BASE_DOMAIN` (currently `21mv.com`).
-To put a site on a different domain (e.g. `cstandt.com`) requires manual nginx vhost
-+ DNS A record after the deploy completes — this is NOT automated.
+Vibe-to-color mappings (use these as starting points, adjust per-site):
 
-## Tech stack (locked, in this exact configuration)
+| Vibe | Primary | Accent | Background |
+|---|---|---|---|
+| playful, bright | `#F5B841` (sunny gold) | `#DE5A37` (warm terracotta) | `#FAF4E8` warm cream |
+| professional, calm | `#1F3A5F` (deep navy) | `#C49A4F` (muted gold) | `#F4F2EC` paper-bone |
+| cozy, warm, handmade | `#9C5A36` (toasted clay) | `#3F5C4A` (forest) | `#F2EAD7` butter-cream |
+| bold, edgy, loud | `#0A0A0A` (near-black) | `#FF3D00` (red-orange) | `#FAFAFA` near-white |
+| quiet, premium | `#2C2A28` (charcoal) | `#A89070` (taupe-gold) | `#F8F5EE` ivory |
+| nature, earthy | `#3F5C4A` (pine) | `#B8856A` (terracotta) | `#F0EBE0` linen |
+| retro, 80s | `#FF006E` (hot pink) | `#3A86FF` (electric blue) | `#FFF5F0` light peach |
+| sport-team-specific | their primary jersey color | secondary jersey color | white or chalk |
 
-```jsonc
-// package.json
+**Picking fonts (2 or 3)** — never `Inter`, `Roboto`, `Poppins`, or `Space Grotesk`.
+Use `@fontsource-variable` packages so they self-host and don't hit Google CDN.
+
+| Vibe | Display (headings) | Body | Italic accent |
+|---|---|---|---|
+| playful | `Bricolage Grotesque Variable` | `Figtree Variable` | `Fraunces Variable` italic |
+| professional | `Fraunces Variable` | `Public Sans Variable` | `Playfair Display` |
+| cozy | `Recoleta` (or `Fraunces` weight 300) | `Plus Jakarta Sans Variable` (skip — use `Public Sans`) | `Caveat` |
+| bold/edgy | `Anton` or `Bowlby One` | `IBM Plex Sans Variable` | `Playfair Display` |
+| premium | `Fraunces Variable` (optical 96) | `Söhne` (skip if not licensed → `Public Sans Variable`) | `GT Sectra` (skip → `Fraunces` italic) |
+| nature | `Fraunces Variable` | `Public Sans Variable` | `Caveat` |
+| retro | `Bungee` or `Limelight` | `Space Mono` | `Comfortaa` |
+
+When in doubt, default to **Bricolage Grotesque + Public Sans + Fraunces italic**.
+That trio is distinctive and works across most niches.
+
+---
+
+## STEP 4 — Set up the project skeleton
+
+Same steps every site, regardless of industry. Use `~/your-projects/<their-subdomain>/`.
+
+```bash
+mkdir -p ~/your-projects/<sub>/src/{lib/{brand,components,data,server},routes/api}
+cd ~/your-projects/<sub>
+```
+
+Write these files (all near-identical across projects — paste these templates):
+
+**`package.json`**:
+```json
 {
+  "name": "<sub>",
+  "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -125,8 +205,8 @@ To put a site on a different domain (e.g. `cstandt.com`) requires manual nginx v
     "@sveltejs/kit":          "^2.16.0",
     "@tailwindcss/vite":      "^4.2.4",
     "tailwindcss":            "^4.2.4",
-    "lucide-svelte":          "0.378.0",   // EXACTLY this version — newer 1.x is Svelte-5 only
-    "@fontsource-variable/<display>":  "*", // pick distinctive serif/sans
+    "lucide-svelte":          "0.378.0",
+    "@fontsource-variable/<display>":  "*",
     "@fontsource-variable/<body>":     "*",
     "@fontsource-variable/<accent>":   "*",
     "pg":                     "^8.13.1",
@@ -142,294 +222,344 @@ To put a site on a different domain (e.g. `cstandt.com`) requires manual nginx v
 }
 ```
 
+> ⚠️ `lucide-svelte` MUST be exactly `0.378.0`. Newer versions are Svelte-5-only
+> and break SSR on Svelte 4.
+
+**`vite.config.ts`** (non-negotiable — the `noExternal` line is required):
 ```ts
-// vite.config.ts — non-negotiable
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss   from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
-  ssr: { noExternal: ['lucide-svelte'] }   // REQUIRED: lucide-svelte ships pre-compiled JS
-                                            //  that Svelte 4 SSR rejects without this.
+  ssr: { noExternal: ['lucide-svelte'] }
 });
 ```
 
-```ts
-// svelte.config.js
+**`svelte.config.js`**:
+```js
 import adapter from '@sveltejs/adapter-node';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 export default { preprocess: vitePreprocess(), kit: { adapter: adapter() } };
 ```
 
-## Design system pattern (the part that matters)
+**`tsconfig.json`**:
+```json
+{
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true, "checkJs": true, "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true, "resolveJsonModule": true,
+    "skipLibCheck": true, "sourceMap": true, "strict": true,
+    "moduleResolution": "bundler"
+  }
+}
+```
 
-The site quality bar is set by a **token contract written before any agent is spawned**.
-Every parallel agent reads the same contract — that's how 9 agents produce coherent UI.
+**`src/app.html`**:
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#<primary-hex>" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="<Brand>" />
+    <meta name="twitter:card" content="summary_large_image" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover" class="bg-bg text-ink">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
+```
 
-Write the contract to `/tmp/<project>-contract.md` and reference it from every agent prompt.
-Required sections:
+**`src/app.d.ts`**:
+```ts
+/// <reference types="@sveltejs/kit" />
+declare namespace App { interface Locals {} }
+```
 
-1. **Working directory** (e.g. `~/your-projects/<project>/`)
-2. **Color tokens** — `@theme` block in `app.css`. Pick a **distinctive palette** keyed
-   to the niche; do NOT reuse Areg's oxblood+sun or Campscout's pine+sun.
-3. **Type pairing** — never `Inter`, `Roboto`, `Poppins`, or `Space Grotesk`. Use
-   `@fontsource-variable` packages for self-hosted variable fonts. Pair a distinctive
-   display serif/sans-serif with a quieter body face, plus an italic accent.
-4. **Component contracts** — `$lib/brand/Logo.svelte`, `$lib/brand/Wordmark.svelte`,
-   `$lib/components/Nav.svelte`, `Footer.svelte`, plus niche-specific cards.
-5. **Authoritative facts** — every name, address, phone, price comes from real sources
-   (archive.org snapshots, the user's docs, current websites). NEVER fabricate.
-6. **Don't-do list** — listed-out aesthetic failure modes (`#3498db`, `Segoe UI`,
-   emoji icons, `rounded-full` everywhere, Bootstrap shadows, "Sarah M. verified guest").
-
-Tailwind v4 specifics:
+**`src/app.css`** — the design tokens go here. Pick from STEP 3.
 
 ```css
-/* src/app.css — the entire CSS file (under 200 lines) */
 @import 'tailwindcss';
 @import '@fontsource-variable/<display>';
 @import '@fontsource-variable/<body>';
 @import '@fontsource-variable/<accent>';
 
 @theme {
-  --color-<primary>: #...;
-  /* … 8-12 named colors total … */
+  --color-ink:     #1A1A17;
+  --color-paper:   #FFFFFF;
+  --color-bg:      <pick>;
+  --color-surface: <pick>;
+  --color-primary: <pick>;
+  --color-accent:  <pick>;
+  --color-muted:   <pick>;
+  --color-pop:     <pick>;
+
   --font-display: "<Display> Variable", Georgia, serif;
   --font-sans:    "<Body> Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-quote:   "<Accent> Variable", Georgia, serif;
+  --font-quote:   "<Accent>", Georgia, serif;
 }
 
-@layer base { /* typography, focus ring, prefers-reduced-motion, ::selection */ }
+@layer base {
+  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+  body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); line-height: 1.65; }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; line-height: 1.08; color: var(--color-ink); }
+  h1 { font-size: clamp(2.5rem, 5vw + 1rem, 5.5rem); font-weight: 450; }
+  h2 { font-size: clamp(2rem, 3vw + 1rem, 3.5rem); font-weight: 500; }
+  h3 { font-size: clamp(1.4rem, 1.5vw + 1rem, 2rem); font-weight: 600; }
+  p  { color: color-mix(in oklab, var(--color-ink) 84%, transparent); }
+  a  { color: inherit; text-decoration: none; }
+  a:hover { color: var(--color-accent); }
+  ::selection { background: var(--color-primary); color: var(--color-ink); }
+  :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
 
-/* ⚠️ CRITICAL: button variants go in @layer components, NOT @utility — Tailwind v4
-   rejects @utility names containing ':' (so `@utility btn-primary:hover` fails build). */
+@utility eyebrow {
+  font-family: var(--font-sans); font-size: 0.72rem; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted);
+}
+
 @layer components {
-  .btn-primary { /* ... */ }
-  .btn-primary:hover { /* ... */ }
-  .btn-ghost   { /* ... */ }
-  /* … */
+  /* ⚠️ button styles MUST go in @layer components — Tailwind v4 rejects @utility names with ':' */
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.9rem 1.8rem;
+    background: var(--color-primary); color: var(--color-ink);
+    font-weight: 600; font-size: 0.95rem;
+    border-radius: 999px;
+    transition: transform 180ms, box-shadow 180ms, background 180ms;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    background: var(--color-accent);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+  }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0;
+    color: var(--color-ink); font-weight: 500;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-ink) 30%, transparent);
+    transition: border-color 180ms, color 180ms;
+  }
+  .btn-ghost:hover { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+  .container-page { margin-inline: auto; max-width: 1280px; padding-inline: 1.5rem; }
+  @media (min-width: 768px) { .container-page { padding-inline: 2.5rem; } }
 }
-
-@utility eyebrow { /* utility-only classes are fine here */ }
 ```
 
-## Information architecture template (niche-agnostic)
-
-```
-/                        Hero + 6-8 home-page sections
-/<categoryA>             Index
-/<categoryA>/[slug]      Detail
-/<categoryB>             Index
-/<categoryB>/[slug]      Detail
-/search                  Filters + results
-/about
-/contact
-/list-your-X             Operator-side B2B page (if directory)
-/guides                  SEO content hub
-/guides/[slug]           Long-form articles (3-5 to start)
-/faq                     FAQ + FAQPage JSON-LD schema
-/compare?ids=…           Side-by-side (if catalog-shaped)
-/shortlist               localStorage favorites
-/admin                   Password-gated CRM/leads view
-/sitemap.xml             Dynamic from DB
-/robots.txt              Cloudflare-managed prepended; append our rules
-/+error.svelte           Custom 404
-/api/health              Health JSON (PLATFORM USES THIS — DO NOT REMOVE)
-/api/leads               POST → DB insert + 2 emails (admin notify + parent confirm)
-/api/chat                Streaming proxy → Ollama gemma2:2b with RAG
-/api/<niche-specific>    e.g. /api/camps-by-slug for shortlist hydration
+Then run:
+```bash
+npm install --no-audit --no-fund
 ```
 
-For each detail page, the `<svelte:head>` MUST include:
-- Unique `<title>` and `<meta name="description">`
-- Canonical URL
-- Open Graph + Twitter cards
-- JSON-LD: `BreadcrumbList` + niche-appropriate (`Hotel`, `SportsActivityLocation`,
-  `LocalBusiness`, `Organization`, `Product`, etc.)
+---
 
-JSON-LD helpers live in `$lib/server/seo.ts` exporting `organizationSchema`,
-`websiteSchema`, `breadcrumbSchema`, `<niche>Schema`, `faqSchema`.
+## STEP 5 — Build the pages
 
-## Build sequence (parallel agent fanout)
+Build in this order. Each step is a single file/component. Use the kid's
+**"What the kid told us"** notes on every page — names, photos, copy, tone.
 
-This is THE pattern. It produced Campscout in one session.
+### 5a. `src/routes/+layout.svelte`
+```svelte
+<script>
+  import '../app.css';
+  import Nav from '$lib/components/Nav.svelte';
+  import Footer from '$lib/components/Footer.svelte';
+</script>
+<Nav />
+<main id="main" class="min-h-screen"><slot /></main>
+<Footer />
+```
 
-1. **Set up the empty project skeleton yourself** (no agent):
-   - `mkdir -p ~/your-projects/<project>/src/{lib/{brand,components,data,server},routes/api}`
-   - Write `package.json`, `vite.config.ts`, `svelte.config.js`, `tsconfig.json`,
-     `src/app.html`, `src/app.d.ts`, `src/app.css`
-   - `npm install --no-audit --no-fund`
-2. **Write the design-token contract** to `/tmp/<project>-contract.md`.
-3. **Spawn parallel agents in a single message** (multiple Agent tool calls):
+### 5b. `src/lib/brand/Logo.svelte` + `src/lib/brand/Wordmark.svelte`
+A custom SVG mark fitting their niche (sun for camp, mountain for outdoor, fork
+for restaurant, basketball for sports, camera aperture for photographer, etc.)
++ a wordmark with their brand name. Keep it under 60 lines of SVG. Reference
+the kid's brand color via `currentColor`.
 
-   | Agent | Model | Files |
-   |---|---|---|
-   | Brand assets | haiku | `Logo.svelte`, `Wordmark.svelte`, `static/favicon.svg` |
-   | Nav + Footer | haiku | `Nav.svelte`, `Footer.svelte` |
-   | Layout + DB + seed | haiku | `+layout.svelte`, `db.ts`, `hooks.server.ts`, `data/sports.ts`, `data/seed.ts`, `api/health` |
-   | Home page (8 sections) | sonnet | `+page.svelte`, `+page.server.ts` |
-   | Category index + detail | haiku | `<cat>/+page.svelte`, `<cat>/[slug]/+page.svelte` and server loads |
-   | Item detail + lead form | sonnet | `<item>/[slug]/+page.svelte`, `LeadForm.svelte` |
-   | Search with filters | sonnet | `/search/+page.svelte` |
-   | Static pages | haiku | `/about`, `/list-your-X`, `/contact`, `/guides`, `/faq`, `/admin` |
-   | API + chatbot widget | sonnet | `/api/leads`, `/api/chat`, `Chatbot.svelte`, `mail.ts` |
-   | SEO core | haiku | `/sitemap.xml`, `/robots.txt`, `/+error.svelte`, `seo.ts` JSON-LD helpers |
+### 5c. `src/lib/components/Nav.svelte`
+Fixed top, transparent over hero, becomes solid on scroll, uses their primary
+color, links to the routes you decided in STEP 2.
 
-   Use **haiku** for mechanical work and **sonnet** for design judgement (home page,
-   detail pages, search UX, chatbot streaming).
+### 5d. `src/lib/components/Footer.svelte`
+4 columns: brand + tagline; whatever 3-column groupings fit (For visitors /
+For [their audience] / Connect). Real contact info from their answers.
 
-4. **`npm run build`** locally to catch errors. Common failures + fixes:
-   - `@apply` in a Svelte `<style>` block → remove (won't compile under Tailwind v4
-     unless you set up `@reference`; easier to delete the `<style>` and rely on
-     classes from `app.css`).
-   - `class="!text-[…]"` (v3 important prefix) → rewrite to `class="text-[…]!"`
-     (v4 suffix form). Sed: `s/!text-\[\([^]]+\)\]/text-[\1]!/g`.
-   - Svelte template references undefined identifier (e.g. `{width}` instead of
-     `width={size}` in an SVG) — Logo.svelte hit this; surfaces as silent
-     "Internal Error" in production until `handleError` hook is added.
-   - `Array(N)` in `{#each}` → use `Array.from({ length: N })` for Svelte 4.
-5. **Tar with the right exclusions**:
-   ```bash
-   tar czf /tmp/<project>-deploy.tar.gz \
-     --exclude=node_modules --exclude=.svelte-kit --exclude=build \
-     --exclude=logs --exclude=tsconfig.tsbuildinfo \
-     --exclude=package-lock.json --exclude=.git \
-     -C ~/your-projects/<project> .
-   ```
-6. **Deploy via the platform API** (see Deploy section below).
+### 5e. `src/routes/+page.svelte` — the home page (THE most important file)
+6–8 sections. The exact set depends on industry but always include:
+1. **Hero** — full-bleed if photo-led, paper if text-led; H1 with one italic word
+   for emphasis; sub; primary CTA + ghost CTA from their "3 actions" answer
+2. **Intro** — 2-paragraph "what we do / who we are" grounded in their answers
+3. **Core thing** — menu / schedule / portfolio / products / programs / etc.
+4. **Why us / what makes it good** — 3-card grid or stat row
+5. **Voices / testimonials** — 3 short quotes (real if they gave you any, or skip)
+6. **Closing CTA** — single biggest call to action centered, button + 1 line
+7. **Optional** — newsletter, map, FAQ teaser, instagram strip
 
-## Platform deploy lifecycle
+### 5f. Per-route detail and listing pages
+Build whatever the IA template needs. Patterns repeat — use the home page's
+section components as building blocks.
+
+### 5g. `src/routes/api/health/+server.ts` (REQUIRED — platform's health check)
+```ts
+import { json } from '@sveltejs/kit';
+export const GET = async () => json({ status: 'healthy', uptime: process.uptime() });
+```
+
+### 5h. Optional: `/api/leads` if they want a contact form
+Wire it to write to Postgres and call the platform mail proxy (see STEP 7).
+
+### 5i. Optional: `/api/chat` + Chatbot widget if they want AI answers
+Stream from `http://127.0.0.1:11434` to a Gemma 2B model. See STEP 8.
+
+### 5j. SEO basics — always include
+- `<svelte:head>` with unique `<title>`, `<meta name="description">`, OG tags,
+  and JSON-LD on the home page (Organization + WebSite)
+- `src/routes/sitemap.xml/+server.ts` — dynamic from the routes you built
+- `src/routes/robots.txt/+server.ts` — `User-agent: *  Allow: /  Sitemap: …`
+- `src/routes/+error.svelte` — custom 404 in the kid's brand voice
+
+---
+
+## STEP 6 — Build + tar + deploy
 
 ```bash
-PLATFORM='https://deploy.21mv.com'
-AUTH="Authorization: Bearer $PLATFORM_API_KEY"
-ORIGIN='Origin: https://deploy.21mv.com'   # REQUIRED — SvelteKit CSRF rejects multipart POST without it
+cd ~/your-projects/<sub>
 
-# List existing
-curl -s -H "$AUTH" "$PLATFORM/api/v1/deployments"
+# Verify it builds locally first
+npm run build
 
-# Delete (if exists, before redeploy with same subdomain)
-curl -s -X DELETE -H "$AUTH" "$PLATFORM/api/v1/deployments/<id>"
+# Tar with the right exclusions (the platform rebuilds inside Docker)
+tar czf /tmp/<sub>-deploy.tar.gz \
+  --exclude=node_modules --exclude=.svelte-kit --exclude=build \
+  --exclude=logs --exclude=tsconfig.tsbuildinfo \
+  --exclude=package-lock.json --exclude=.git \
+  -C ~/your-projects/<sub> .
 
-# Deploy
+# Deploy via the platform API (the Origin header is required)
 curl -s -X POST --max-time 300 \
-  -H "$AUTH" -H "$ORIGIN" \
-  -F "name=<subdomain>" \
-  -F "file=@/tmp/<project>-deploy.tar.gz" \
-  "$PLATFORM/api/v1/deploy"
-# Returns 201 with { id, subdomain, url }; on slow builds CF returns 524 after
-# ~100s but server keeps building — verify by re-listing deployments.
+  -H "Authorization: Bearer $PLATFORM_API_KEY" \
+  -H 'Origin: https://deploy.21mv.com' \
+  -F "name=<sub>" \
+  -F "file=@/tmp/<sub>-deploy.tar.gz" \
+  https://deploy.21mv.com/api/v1/deploy
 
-# Verify
-curl -sL "https://<subdomain>.21mv.com/api/health"
+# On success: 201 with { id, subdomain, url }
+# Cloudflare may cut at ~100s with 524 — server keeps building. Verify by listing:
+curl -s -H "Authorization: Bearer $PLATFORM_API_KEY" \
+  https://deploy.21mv.com/api/v1/deployments
 ```
 
-Container env (set automatically by deployer):
+The deployed app gets these env vars automatically:
+
+| env | what it is |
+|---|---|
+| `DATABASE_URL` | per-app Postgres (auto-created, isolated from other apps) |
+| `ORIGIN` | full HTTPS URL of the deployed site |
+| `PORT` | the host port the app must listen on |
+
+Apps do NOT receive `MAIL_API_KEY`, `OLLAMA_BASE`, etc. Mail goes through the
+platform proxy (STEP 7); Ollama is at the well-known address (STEP 8).
+
+If they need to redeploy (delete then re-create with same name):
+```bash
+# Get the id
+ID=$(curl -s -H "Authorization: Bearer $PLATFORM_API_KEY" \
+  https://deploy.21mv.com/api/v1/deployments | jq -r '.deployments[]|select(.subdomain=="<sub>")|.id')
+
+# Delete (stops container, removes nginx vhost, drops per-app DB, removes DNS record)
+curl -s -X DELETE -H "Authorization: Bearer $PLATFORM_API_KEY" \
+  -H 'Origin: https://deploy.21mv.com' \
+  https://deploy.21mv.com/api/v1/deployments/$ID
+
+# Then re-deploy with the same `name=<sub>` to keep the URL
 ```
-DATABASE_URL=postgresql://u_<id>:<pw>@127.0.0.1:5432/app_<id>
-ORIGIN=https://<subdomain>.21mv.com
-PORT=<allocated, e.g. 10007>
-```
 
-That's it. **Apps do not get a 3ava mail key, an Ollama URL config, or any other
-shared platform secret.** Mail goes through the platform's mediated endpoint
-(see below); Ollama is reachable at the well-known localhost address; everything
-else the app needs to do, it does on its own.
+---
 
-Container uses `NetworkMode: 'host'` so:
-- App listens on `0.0.0.0:${PORT}` directly on host
-- Can reach Postgres at `127.0.0.1:5432`
-- Can reach Ollama at `127.0.0.1:11434`
-- Has working host DNS for outbound calls
+## STEP 7 — Sending mail (the platform sends, not your app)
 
-## Sending mail (the platform sends, not your app)
-
-**Apps do NOT have their own 3ava key and CANNOT send email directly.** The platform
-holds the only mail key, owns the verified sender domains (`21mv.com`, `3ava.com`,
-`amdy.io`, etc.), and exposes a single mediated endpoint:
+**Apps do NOT have a mail key.** To send mail from a deployed app, call the
+platform's mail proxy with the same `dp_…` deploy key:
 
 ```
 POST https://deploy.21mv.com/api/v1/mail/send
-Authorization: Bearer <PLATFORM_API_KEY>     # the same dp_… you used to deploy
+Authorization: Bearer <PLATFORM_API_KEY>
 Content-Type: application/json
 
 {
-  "to": "user@example.com",                  // string OR array of strings
+  "to": "user@example.com",
   "subject": "Subject line",
   "html": "<p>HTML body</p>",
-  "reply_to": "optional-reply-to@example.com"
+  "reply_to": "optional"
 }
 ```
 
-Response on success: `201 { "ok": true, "provider_id": "...", "status": "queued" }`.
+Returns `201 { "ok": true, "provider_id": "...", "status": "queued" }` on success.
 
-The platform fills in `from` (currently `21mv.com <noreply@21mv.com>`), forwards
-to 3ava with its own key, and logs the send. You don't pick the sender domain,
-verify domains, or rotate keys — that's the platform's job.
+The platform fills in `from` (using its verified sender domain — currently
+`21mv.com <noreply@21mv.com>`), forwards to 3ava with its own key, and logs.
+Apps don't pick the sender domain, verify domains, or rotate keys.
 
-**App code pattern** (when your app's `/api/leads` or contact handler wants to
-notify someone):
-
+**App-side template** (`src/lib/server/mail.ts`):
 ```ts
-// $lib/server/mail.ts
 const PLATFORM = 'https://deploy.21mv.com';
-const KEY = process.env.PLATFORM_API_KEY; // app stores its own dp_… key as a secret
+const KEY = process.env.PLATFORM_API_KEY; // app stores its own dp_… as a secret env
 
-export async function sendMail(p: { to: string | string[]; subject: string; html: string; reply_to?: string }) {
+export async function sendMail(p: { to: string|string[]; subject: string; html: string; reply_to?: string }) {
   if (!KEY) { console.log('[mail] skipped (PLATFORM_API_KEY unset)'); return { sent: false }; }
   const r = await fetch(`${PLATFORM}/api/v1/mail/send`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(p)
   });
-  if (!r.ok) {
-    const text = await r.text().catch(() => '');
-    console.error('[mail] platform returned', r.status, text.slice(0, 200));
-    return { sent: false, reason: `HTTP ${r.status}` };
-  }
+  if (!r.ok) { console.error('[mail]', r.status); return { sent: false }; }
   const j = await r.json();
   return { sent: true, provider_id: j?.provider_id };
 }
 ```
 
-`PLATFORM_API_KEY` must be passed to the app at deploy time as a custom env var,
-or the app simply doesn't send mail (it'll log skip and continue). The platform
-doesn't auto-inject it — apps that want mail must explicitly request it.
+The kid sets `PLATFORM_API_KEY` on their app's container at deploy time (or
+adds it via the platform UI later). Without it, mail just no-ops — the rest of
+the app works fine.
 
-## Ollama chatbot integration (RAG)
+---
 
-The deploy server runs Ollama natively on `127.0.0.1:11434`. Available models:
-- `gemma2:2b` — recommended default, ~16 tok/s, ~2 GB RAM, ~0.5s first token
-- `gemma4:e4b` — Google's 2026 reasoning model, ~6 tok/s, ~10 GB RAM, ~5s first token,
-  REQUIRES `"think": false` in the request or it hits the predict cap on internal
-  reasoning tokens with empty visible content
+## STEP 8 — Adding a chatbot (Ollama, free + local)
 
-Server-side proxy at `/api/chat`:
+The platform host runs Ollama natively at `127.0.0.1:11434` with `gemma2:2b`
+loaded. Any deployed app can stream chat replies from it for free.
+
+`src/routes/api/chat/+server.ts`:
 ```ts
-const OLLAMA = process.env.OLLAMA_BASE || 'http://127.0.0.1:11434';
-const MODEL  = process.env.CHAT_MODEL  || 'gemma2:2b';
+import type { RequestHandler } from './$types.js';
+export const config = { csrf: { checkOrigin: false } };
+
+const OLLAMA = 'http://127.0.0.1:11434';
+const MODEL  = 'gemma2:2b';
 
 export const POST: RequestHandler = async ({ request }) => {
   const { messages } = await request.json();
-  const last = [...messages].reverse().find(m => m.role === 'user')?.content || '';
 
-  // RAG: keyword-match against your DB, top 5
-  const tokens = last.toLowerCase().match(/[a-z]{3,}/g) || [];
-  // … build SQL query joining context tables, params=tokens.slice(0,6), LIMIT 5 …
-  const ctx = relevant.map(r => `• ${r.name} — ${r.short_description}`).join('\n');
+  // Optional RAG: feed your app's data as context
+  const sys = { role: 'system', content: `You are <Brand>'s helpful assistant. Reply in 2-4 sentences.` };
 
-  const sysMsg = {
-    role: 'system',
-    content: `You are <Brand>'s assistant. Reply in 2-4 sentences. Never invent items not in CONTEXT below.\n\nCONTEXT:\n${ctx}`
-  };
   const upstream = await fetch(`${OLLAMA}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL, stream: true,
       options: { num_predict: 300, temperature: 0.4 },
-      messages: [sysMsg, ...messages.filter(m => m.role !== 'system')]
+      messages: [sys, ...messages.filter((m: any) => m.role !== 'system')]
     })
   });
   return new Response(upstream.body, {
@@ -438,133 +568,224 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 ```
 
-Client widget streams NDJSON, accumulates `chunk.message.content` into the live
-assistant message bubble. See `Chatbot.svelte` in any deployed site for the pattern.
+Client widget reads NDJSON, accumulates `chunk.message.content` into the live
+assistant message bubble. (See `Chatbot.svelte` in any reference project.)
 
-## Platform's known bugs (fixed but watch out)
+If the kid wants the bot to know about their data (e.g. menu items, schedule),
+add a Postgres lookup before the upstream fetch and inject results into the
+system message — that's RAG.
 
-These bugs were in the platform source on the server. They've been fixed but if a
-fresh `npm run build` / `systemctl restart deploy-platform` exposes any of them
-again on a new host setup, here's the playbook:
+---
 
-1. **`hooks.server.ts` prefix bug**: `split('_').slice(0,2).join('_')` rejoins to the
-   full key, never matches the 8-char DB prefix. Fix: `rawKey.substring(0, 8)`.
-2. **`auth.ts` SELECT missing `key_hash`** → bcrypt.compare(password, undefined) → 500.
-   Fix: `SELECT ak.user_id, ak.key_hash, u.email FROM api_keys ak JOIN users u ON ak.user_id = u.id WHERE ak.prefix = $1`.
-3. **API routes missing CSRF disable** → 403 on multipart POST. Add to every
-   `/api/v1/*` route: `export const config = { csrf: { checkOrigin: false } };`.
-4. **`createAppDatabase` missing public schema GRANTs** (Postgres 15+ default-deny).
-   After CREATE DATABASE + CREATE USER + GRANT ALL PRIVILEGES ON DATABASE, also:
-   ```ts
-   const adminAppPool = new Pool({ connectionString: process.env.DATABASE_URL.replace(/\/[^/]+$/, `/${dbName}`) });
-   await adminAppPool.query(`GRANT ALL ON SCHEMA public TO ${dbUser}`);
-   await adminAppPool.query(`GRANT ALL ON SCHEMA public TO PUBLIC`);
-   await adminAppPool.end();
-   ```
-5. **`docker.buildImage({}, { networkmode: 'host' })` silently ignored** by current
-   Docker Engine. npm install hangs on bridge-network DNS. Fix: shell out to
-   `execSync('docker build --network=host -t ${imageName} ${deployDir}', { stdio: 'inherit' })`.
-6. **Container `NetworkMode: 'bridge'` + `PortBindings`** has DNS issues on this host —
-   container can't resolve external hostnames. Use `NetworkMode: 'host'` + bind to the
-   allocated port directly (Env: `PORT=${port}`, DB host: `127.0.0.1`).
-7. **PostgreSQL `listen_addresses`**: must be `*` (not `localhost`) so containers can
-   reach 5432 from any interface. `ALTER SYSTEM SET listen_addresses = '*'` + restart.
-8. **nftables firewall** (`inet filter input`, policy drop): allow rules needed for
-   - Cloudflare IPs → 80, 443
-   - Docker bridge `172.17.0.0/16` → 5432 (harmless safety net even with host-net containers)
-9. **SvelteKit body limit 512 KB** rejects every real tarball. Set
-   `BODY_SIZE_LIMIT=10485760` in platform `.env` (loaded via systemd `EnvironmentFile`).
-10. **`BASE_DOMAIN` env not loaded by systemd.** Required: `EnvironmentFile=-/opt/deploy-platform/.env`
-    in the systemd unit. Also `Environment=NODE_ENV=production`.
+## STEP 9 — Verify everything works
 
-## Tarball size budget
+Run through this checklist before declaring victory:
 
-Max upload via `POST /api/v1/deploy` is the platform's `BODY_SIZE_LIMIT` (10 MB if
-configured per #9 above). Hero images dominate. If your tar exceeds the limit:
+- [ ] Home page returns 200 with size > 20 KB
+- [ ] All routes you built return 200
+- [ ] Custom 404 renders on `/intentionally-missing`
+- [ ] Real content appears (the kid's words, names, photos — not lorem ipsum)
+- [ ] `/sitemap.xml` lists all routes
+- [ ] JSON-LD on home: `Organization` + `WebSite` schemas present
+- [ ] If contact form: `POST /api/leads` returns 201; row in DB; mail sent (provider_id returned from `/api/v1/mail/send`)
+- [ ] If chatbot: `POST /api/chat` streams NDJSON
+- [ ] `npm run check` clean (or no NEW errors vs baseline)
+- [ ] Mobile-friendly: open the site on a phone-width viewport
+- [ ] Dark mode honored if the kid asked for one (Tailwind `dark:` variants)
 
-```bash
-# Resize to 1280px max width, q72, strip metadata
-for img in static/images/*.{jpg,jpeg,png}; do
-  convert "$img" -resize '1280x>' -quality 72 -strip -interlace JPEG "$img.new"
-  mv "$img.new" "$img"
-done
-```
+---
 
-## Verification checklist (run before declaring victory)
+## What the kid customizes (always weave these in)
 
-- [ ] `curl -sL "$URL/" -o /dev/null -w 'HTTP %{http_code} size=%{size_download}\n'` → 200, > 20 KB
-- [ ] Real-content grep on home: niche-specific keywords appear ≥3 times each (proves
-      DB seed loaded, not a fallback page)
-- [ ] All static + dynamic routes return 200 (loop the IA list)
-- [ ] Custom 404 renders on `/intentionally-missing` — grep for your "still at camp"
-      style brand-voice phrase
-- [ ] `/sitemap.xml` lists every dynamic route (count `<url>` entries vs DB row count)
-- [ ] `/robots.txt` ends with `Sitemap: $URL/sitemap.xml` (Cloudflare prepends managed
-      content; that's fine, your line stays valid at the bottom)
-- [ ] JSON-LD on home: grep `'application/ld+json'`, `'Organization'`, `'WebSite'`
-- [ ] JSON-LD on item detail: niche-specific schema (Hotel/SportsActivityLocation/etc) +
-      `BreadcrumbList`
-- [ ] FAQPage JSON-LD on `/faq` if applicable
-- [ ] `POST /api/leads` returns 201; row appears in `leads` table. If your app calls
-      the platform mail proxy (`POST https://deploy.21mv.com/api/v1/mail/send` with the
-      `dp_…` key), the response body has a `provider_id` UUID — that means the platform
-      successfully forwarded the message to 3ava. Mail can also be cross-checked from
-      the platform host with `curl -H "Authorization: Bearer $MAIL_API_KEY" "https://mail.3ava.com/api/emails?limit=3"` (this command runs ON the platform host using the platform's own key — not from your app).
-- [ ] `POST /api/chat` streams NDJSON; assistant grounded in catalog (no hallucinations)
-- [ ] `npm run check` clean (or no NEW errors versus baseline)
+The kid's answers from STEP 1 are the difference between a generic site and
+their site. Reference them on every page. Specifically:
 
-## Mapping a custom domain (e.g. cstandt.com → campscout container)
+| Kid input | Where it goes |
+|---|---|
+| Site purpose | Hero subheadline, footer tagline, page titles |
+| Audience | Voice/tone everywhere; alt text language |
+| 3 actions | The 3 CTAs (hero, sticky in nav, in closing section) |
+| Vibe | Palette + font choices in `app.css` |
+| Subdomain | Deploy `name=<sub>`, all canonical URLs in `<svelte:head>` |
+| Specific images | `static/images/` — referenced by name in pages |
+| Specific text | Verbatim in headlines, intro paragraph, about section |
+| Specific colors | Override `--color-primary` / `--color-accent` in `app.css` |
+| Specific contact | Footer, contact page, `<address>` in JSON-LD |
+| Off-limits items | Don't include them, even if the template has them by default |
 
-The platform only auto-provisions `*.21mv.com`. For a custom domain:
+If the kid says **"actually, change the [thing]"** mid-build, just change it.
+Re-deploy is `delete + POST` — fast.
 
-1. **Cloudflare A record**: in the target domain's CF zone, add `@` and `www` A records
-   pointing to `152.53.194.247`, proxied. Or wildcard if you want all subdomains
-   inherited.
-2. **nginx vhost**: SSH and add a vhost in `/etc/nginx/sites-available/<custom-domain>`
-   that proxies to the same `127.0.0.1:<port>` as the platform-managed vhost. Use the
-   exact template from `templates/nginx-site.conf` in the vercel-clone repo.
-3. **CF SSL mode**: must be `Flexible` if origin only has port 80, OR provision an
-   Origin CA cert / Let's Encrypt and use `Full (Strict)`. Dashboard → SSL/TLS → Overview.
+---
 
-## Files to never delete
+## Common gotchas + fixes
 
-- `/api/health` route (platform's status check uses it)
-- `hooks.server.ts` (lazy-init platform DB schema on first request)
-- `nanoid` dep (used by ID generation in deployer)
+| Gotcha | Fix |
+|---|---|
+| Build fails: `@apply` in `<style>` | Tailwind v4 rejects `@apply` inside Svelte `<style>` blocks. Move all button/component styles to `app.css` `@layer components`. |
+| Build fails: `class="!text-…"` | v3 important prefix → use suffix form `class="text-…!"` |
+| Silent 500 in production | SvelteKit's default `handleError` swallows errors. Add a `handleError` hook to `hooks.server.ts` that logs `error.message` + `error.stack`. |
+| `lucide-svelte` SSR error | Pin to `0.378.0` AND add `ssr: { noExternal: ['lucide-svelte'] }` to `vite.config.ts`. |
+| `{width}` shorthand undefined | In SVG props, write `width={size}` not `{width}`. |
+| `Array(N)` in `{#each}` | Use `Array.from({ length: N })` (Svelte 4 reactivity). |
+| Tarball > 10 MB | Resize hero images to 1280px max + JPEG q72: `convert in.jpg -resize 1280x> -quality 72 -strip out.jpg`. |
+| Cloudflare 524 on deploy | CF cuts at ~100s; server keeps building. Verify with `GET /api/v1/deployments`. |
+| Platform CSRF 403 | Always send `Origin: https://deploy.21mv.com` header on POSTs. |
+| 3AVA "Domain not verified" | Won't happen — apps use platform proxy, which already has verified domains. |
 
-## Cost-aware sub-agent model selection
+---
 
-When spawning sub-agents via the Agent tool:
-- **Haiku** for mechanical/boilerplate: file scaffolds, npm installs, git ops,
-  formatting fixes, web-search-driven research, scraping
-- **Sonnet** for design judgment: home pages, detail pages, search UX, chatbot
-  streaming, debugging unknown failure modes
-- **Opus** is rarely needed for this kind of work — reserve for cross-system
-  refactors or hard architectural decisions
+## Parallel agent fanout (optional, if your tool supports it)
 
-User's standing rule (saved in memory): "estimate task difficulty before spawning;
-default to haiku for simple work."
+If the AI tool supports spawning sub-agents (Claude Code's Task, kilocode's
+multi-agent mode), you can do STEPS 5a–5j in parallel with one model call.
+Send a single message with multiple agent tool uses, each writing different
+files. Cuts build time from ~15 min to ~3-5 min.
 
-## Reference projects on this platform
+Suggested partitioning:
 
-- **`~/your-projects/<reference-project>/`** → `https://areghotel.21mv.com` — Yerevan hotel
-  revival from archive.org 2019 snapshots. Palette: oxblood + sun-gold on cream.
-  Type: Fraunces + Public Sans + Playfair italic.
-- **`~/your-projects/<your-project>/`** → `https://campscout.21mv.com` — worldwide kids' summer
-  camp directory with lead-gen CRM. Palette: pine + sun + ember on cream.
-  Type: Bricolage Grotesque + Figtree + Fraunces italic. 25 seeded camps + chatbot.
+| Agent | Files |
+|---|---|
+| Agent 1 (cheap model) | `app.css`, `app.html`, `app.d.ts`, `vite.config.ts`, `package.json`, `svelte.config.js`, `tsconfig.json`, `+layout.svelte` |
+| Agent 2 (cheap model) | `Logo.svelte`, `Wordmark.svelte`, `static/favicon.svg` |
+| Agent 3 (cheap model) | `Nav.svelte`, `Footer.svelte` |
+| Agent 4 (best model) | Home page (`+page.svelte` + server load) — **the design-critical file** |
+| Agent 5 (cheap model) | Listing pages (category index + detail) |
+| Agent 6 (cheap model) | Static pages (about, contact, FAQ, etc.) |
+| Agent 7 (cheap model) | `/api/health`, `/api/leads`, `/api/chat`, `mail.ts` |
+| Agent 8 (cheap model) | `sitemap.xml`, `robots.txt`, `+error.svelte`, `seo.ts` JSON-LD |
+| Agent 9 (cheap model) | DB schema (`hooks.server.ts` + `db.ts` + seed data if needed) |
 
-Read either project's source as a working reference when starting a new niche.
+Pass all agents the **same shared context file** (`/tmp/<sub>-contract.md`)
+with: design tokens, brand voice, kid's customization notes, IA list. That's
+how 9 agents produce coherent UI without stepping on each other.
 
-## Memory artifacts
+If your tool doesn't support sub-agents, do them sequentially in this order
+— it works fine, just slower.
 
-This skill is most powerful when paired with persistent memory at:
-- `~/.claude/projects/-home-na-vercel-clone/memory/MEMORY.md` and siblings
-- Specifically `project_campscout.md`, `reference_user_owned_services.md`,
-  `feedback_agent_model_for_installs.md`
+---
 
-When starting a new project, write a fresh `project_<name>.md` memory file capturing:
-- Domain target, brand name, sport/niche
-- API keys location reminder (NEVER the keys themselves)
-- Catalog size and depth decision
-- Open follow-ups
+## Appendix A — Kid prompt examples and what to build for each
+
+**1. *"I want a site for my soccer team, the Tigers. Show our schedule and roster."***
+- Industry template: **Sports team**
+- Subdomain: `tigers-soccer.21mv.com`
+- Routes: `/`, `/schedule`, `/roster`, `/news`, `/join`
+- Palette: their jersey colors (ask: "what color are your jerseys?")
+- Hero: action photo or solid jersey-color block + "TIGERS · 2026 SEASON"
+- Schedule renders from a static array; roster is photo grid
+- Contact form to `/api/leads` for "Want to join the team" requests
+
+**2. *"My mom owns a bakery — site with menu, location, contact form."***
+- Industry: **Restaurant / café / bakery**
+- Subdomain: `<momsname>-bakery.21mv.com`
+- Routes: `/`, `/menu`, `/visit`, `/order`, `/about`
+- Palette: terracotta + cream + leaf-green (cozy, warm, handmade)
+- Hero: full-bleed photo of pastries + "Fresh, daily, since [year]"
+- Menu page is a long list grouped by category, prices in tabular nums
+- `/visit` has hours, address, embedded map (Leaflet + OSM, no Google Maps)
+
+**3. *"My art portfolio — drawings, paintings, comics. Black background, big images."***
+- Industry: **Photographer / videographer** (close enough — image-led)
+- Subdomain: `<theirname>-art.21mv.com`
+- Routes: `/`, `/galleries`, `/galleries/[slug]`, `/about`, `/contact`
+- Palette: bg=#0A0A0A, primary=their signature accent color, paper=#1A1A1A
+- Type: serif display + mono body for that art-zine feel
+- Hero: zero text initially, just a 16:9 of the strongest piece. Headline appears on scroll.
+- Galleries are masonry layouts; clicking opens lightbox
+
+**4. *"Site for my dad's tutoring business, math + physics, ages 14-18."***
+- Industry: **Tutor / coach / lessons**
+- Subdomain: `<dadsname>-tutoring.21mv.com`
+- Routes: `/`, `/services`, `/rates`, `/about`, `/book`
+- Palette: trust-blue + warm cream + orange accent (professional, parent-friendly)
+- Hero: "Math + physics tutoring for high schoolers · Brooklyn · since 2018"
+- `/services` lists subjects with grade levels; `/rates` has a transparent table
+- `/book` form captures parent name, student age, subjects, preferred times → `/api/leads`
+
+**5. *"Website for my D&D campaign — character pages, recap blog, session schedule."***
+- Industry: **Fan site / hobby community** (with blog elements)
+- Subdomain: `<campaign-name>.21mv.com`
+- Routes: `/`, `/characters`, `/characters/[slug]`, `/recaps`, `/recaps/[slug]`, `/schedule`
+- Palette: parchment + ink + gold + crimson (cozy + premium hybrid)
+- Type: serif heavy (Fraunces + Cormorant Garamond), italic accent
+- Character pages have stat blocks, portrait, backstory
+- Recaps are markdown blog posts (use mdsvex)
+
+**6. *"My senior project: an online directory of LGBTQ-friendly therapists in the Bay Area."***
+- Industry: **Directory / lead-gen** (close to Campscout)
+- Subdomain: `bay-affirming-care.21mv.com`
+- Routes: `/`, `/specialty`, `/specialty/[slug]`, `/therapists/[slug]`, `/search`, `/about`, `/list-your-practice`
+- Palette: muted lilac + sage + cream (quiet, premium, calming)
+- Hero: editorial headline, no stock photos
+- Therapist detail pages with verified credentials + lead form
+- Sensitive topic — voice is calm, plain, anti-marketing
+
+**7. *"My band's website. We're called Static Bloom. Show tour dates, stream our songs, sell merch."***
+- Industry: **Hybrid** (events + store + about)
+- Subdomain: `staticbloom.21mv.com`
+- Routes: `/`, `/tour`, `/listen`, `/shop`, `/shop/[slug]`, `/about`
+- Palette: bold/edgy — black + neon green or magenta + grain texture
+- Type: Bowlby One display + Space Mono body
+- Hero: full-bleed band photo (B&W) + tour-dates strip below
+- Shop is barebones (Stripe link out, not an embedded checkout — that's another feature)
+
+**8. *"Charity site: we collect winter coats for kids. Just need a donate page and our mission."***
+- Industry: **Charity / nonprofit**
+- Subdomain: `coats-for-kids-<city>.21mv.com`
+- Routes: `/`, `/mission`, `/programs`, `/donate`, `/contact`
+- Palette: warm primary (mustard or rust) + deep brown text + cream bg
+- Hero: real photo of kid in coat (ask the kid for an image they have permission to use)
+- `/donate` links to their existing GoFundMe / Stripe / Bank QR
+- Plain, sincere voice. No marketing-speak.
+
+**9. *"Birthday party invite for my brother — RSVP, address, what to bring."***
+- Industry: **Event landing**
+- Subdomain: `<brothername>-bday.21mv.com`
+- Routes: `/`, `/details`, `/rsvp`
+- Palette: party-bright (whatever theme — superhero, dinosaur, princess, gaming)
+- Hero: countdown timer + "Lucas turns 8! · Saturday March 14"
+- `/details` is the practical block — address, what to bring, parking
+- `/rsvp` form → `/api/leads` (parent name + kid name + yes/no)
+
+**10. *"Resume site for me — I'm 16, want to apply for a coding internship."***
+- Industry: **Personal portfolio / résumé**
+- Subdomain: `<theirname>.21mv.com`
+- Routes: `/`, `/work`, `/about`, `/writing`, `/resume.pdf` (downloadable)
+- Palette: one signature color + paper-white + ink (confident, quiet)
+- Hero: their name in a giant Fraunces display, one-line bio, mailto link
+- `/work` is a 2-column grid of projects with screenshots + GitHub links
+- Print-friendly CSS so `/resume.pdf` looks great if they print the page
+
+For each: weave in their real names, photos, words. Never use placeholders.
+
+---
+
+## Reference projects on the same platform
+
+- **<https://areghotel.21mv.com>** — Yerevan hotel revival, oxblood + sun-gold,
+  Fraunces + Public Sans + Playfair italic. Built from archive.org snapshots.
+- **<https://campscout.21mv.com>** — worldwide kids' summer camp directory,
+  pine + sun, Bricolage Grotesque + Figtree + Fraunces italic. Has chatbot + CRM.
+
+Open the source of either as a working pattern reference (the GitHub mirror
+of the platform may include them as examples).
+
+---
+
+## TL;DR — for the AI
+
+1. Read `required_secrets`. Ask the kid for `PLATFORM_API_KEY` if missing.
+2. Run STEP 1 — ask the 5 questions + customizations.
+3. Pick a template from STEP 2. Pick palette + fonts from STEP 3.
+4. Scaffold (STEP 4), build pages (STEP 5), tar, deploy (STEP 6).
+5. Optionally wire mail (STEP 7) and/or chatbot (STEP 8).
+6. Verify (STEP 9). Hand the kid their `https://{sub}.21mv.com` URL.
+
+When in doubt, prefer:
+- More whitespace
+- Bigger type
+- Real content from the kid over fabricated copy
+- Defaults from this skill over inventing new ones
+
+The pattern is locked. The personality comes from what the kid tells you.

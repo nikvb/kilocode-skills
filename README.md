@@ -1,25 +1,30 @@
 # kilocode-skills
 
-Agent skills for AI coding assistants — works with **kilocode**, **Claude Code**, **Cursor**, and any tool that understands skill files with YAML frontmatter.
+Agent skills for AI coding assistants — works with **kilocode** (free models!), **Claude Code**, **Cursor**, and any tool that understands skill files with YAML frontmatter.
 
 ## What's here
 
 ### [`build-vercel-clone-site`](./build-vercel-clone-site/SKILL.md)
 
-**Build a real website with one prompt.** Tell your AI assistant the kind of site you want — *"I want a directory of basketball camps for kids"* or *"a one-page restaurant site for my mom's bakery"* — and it'll build the whole thing and put it live on the internet at `your-name.21mv.com`.
+**Build any website with one prompt.** Tell your AI assistant what kind of site you want and it'll build it and put it live on the internet at `your-name.21mv.com`.
 
-You don't need to set up a server, install anything, or learn DevOps. The skill calls a hosted platform that does all of that for you.
+Designed for **kids and beginners using kilocode with FREE models** (Qwen 2.5, DeepSeek-V2.5, Gemini Flash, local Llama 3.1). No credit card. The AI builds the site on your computer, then asks for your platform API key and deploys it for you.
 
-**What you get when you use this skill:**
+**Sites you can build with this**:
 
-- A real, live website on the open web at `<your-pick>.21mv.com`
-- SvelteKit 2 + Svelte 4 + Tailwind v4 — modern, fast, mobile-friendly
-- Built-in pages: home, search, listings, detail pages, FAQ, custom 404, sitemap
-- A working contact / lead form that actually emails you (transactional email is wired automatically)
-- A chatbot widget (powered by a local Gemma model) that can answer questions about your content
-- SEO done right: per-page Open Graph, JSON-LD schema for Google rich results, dynamic sitemap
-- Database (Postgres) provisioned and connected — every site gets its own
-- The whole thing built and deployed in about 15 minutes by 9 sub-agents working in parallel
+- 🍞 Restaurants, cafés, bakeries — menu, hours, reservations
+- ⚽ Sports teams & clubs — schedule, roster, news, signup
+- 🎒 School clubs & class projects — about, members, projects
+- 📷 Portfolios — artists, photographers, writers, students applying for internships
+- 🛍️ Tiny online stores — up to ~30 products
+- 📝 Blogs & newsletters — markdown posts, RSS, subscribe
+- 🏨 Hotels & B&Bs — rooms, gallery, booking
+- ❤️ Charities — mission, programs, donate page
+- 🔍 Directories — lead-gen sites for any niche (camps, therapists, contractors, etc.)
+- 🎉 Event landing pages — birthdays, weddings, festivals, RSVPs
+- 🎲 Fan / hobby sites — D&D campaigns, fandoms, niche communities
+- 🌐 Expired-domain revivals — pull the old site from archive.org, modernize, relaunch
+- ✨ Anything else — the skill covers patterns, not just specific niches
 
 **Live demonstrations** (built with this exact skill):
 
@@ -27,6 +32,20 @@ You don't need to set up a server, install anything, or learn DevOps. The skill 
 |---|---|
 | <https://areghotel.21mv.com> | A historical Yerevan hotel revived from archive.org snapshots — oxblood + sun-gold palette |
 | <https://campscout.21mv.com> | Worldwide kids' summer-camp directory with lead-gen CRM and chatbot — pine + sun palette |
+
+## How it works (kid version)
+
+1. **Install kilocode** in VS Code (it's free): <https://kilo.code>
+2. **Pick any free model** in kilocode's settings (Qwen 2.5 Coder is great)
+3. **Drop the skill into your project**:
+   ```bash
+   git clone https://github.com/nikvb/kilocode-skills ~/.kilocode/skills/kilocode-skills
+   ```
+4. **Sign up at <https://deploy.21mv.com/auth/signup>** and copy your `dp_…` API key
+5. **Tell the AI what you want** — it'll ask 5 quick questions, then build the site
+6. **Give it your API key when it asks** — it deploys, you get a live URL
+
+That's the whole thing. No servers. No DNS. No email setup.
 
 ## Install
 
@@ -36,7 +55,7 @@ You don't need to set up a server, install anything, or learn DevOps. The skill 
 git clone https://github.com/nikvb/kilocode-skills ~/.kilocode/skills/kilocode-skills
 ```
 
-Or grab just the one skill (no git needed):
+Or grab just the one skill:
 
 ```bash
 mkdir -p ~/.kilocode/skills/build-vercel-clone-site && \
@@ -56,31 +75,46 @@ curl -sL https://raw.githubusercontent.com/nikvb/kilocode-skills/main/build-verc
 
 Drop the file in your tool's skills directory.
 
-## All you need: a platform API key
+## What the AI asks the kid
 
-The skill calls a hosted platform at `https://deploy.21mv.com`. The platform handles servers, databases, mail, DNS — none of that is your problem.
+When the skill activates, the AI runs through 5 quick questions (~2 minutes total):
 
-**To deploy you need ONE thing:** an API key from `deploy.21mv.com`.
+1. **What's the site for?** — restaurant, sports team, portfolio, store, etc.
+2. **Who's it for?** — parents, classmates, customers, fans, anyone…
+3. **What 3 things do you want visitors to do?** — book, email, read, buy, RSVP, donate, sign up…
+4. **What's the vibe?** — playful / professional / cozy / bold / quiet / nature / retro
+5. **What's the URL name?** — letters and dashes only, e.g. `tigers-soccer` → `tigers-soccer.21mv.com`
 
-1. Go to <https://deploy.21mv.com/auth/signup> and create a free account
-2. After login, visit `/dashboard/keys` and click **"Generate API key"**
-3. Copy the `dp_…` key. **Save it somewhere safe — the platform shows it once.**
-4. When your AI assistant asks for `PLATFORM_API_KEY`, paste it.
+Plus any **specific stuff the kid wants included**: their photos, their text, their colors, their phone number, things to leave OUT, etc.
 
-That's it. Your assistant takes it from there: builds the site, packages it, POSTs to the platform, the platform builds a Docker image and runs it, you get a `https://{your-subdomain}.21mv.com` URL.
+The AI uses every answer on every page. Generic AI slop is the failure mode this skill works hardest to avoid.
 
-### What the platform gives every deployed site (you don't configure these)
+## Example prompts a kid can paste
+
+> *"Build me a site for my soccer team, the Tigers. Show our schedule and roster. Use the build-vercel-clone-site skill. My deploy key is dp_…"*
+
+> *"My mom owns a bakery — site with menu, location, contact form. Use the build skill, name it `morning-glory-bakery`."*
+
+> *"Resume site for me — I'm 16, applying for a coding internship. Use the skill, my name is the subdomain."*
+
+> *"Revive cstandt.com from archive.org as a Colorado-Springs gymnastics directory."*
+
+> *"Birthday invite for my brother Lucas — RSVP page, what to bring, address. He's turning 8."*
+
+The skill includes 10 worked examples in [Appendix A](./build-vercel-clone-site/SKILL.md#appendix-a--kid-prompt-examples-and-what-to-build-for-each).
+
+## What the platform gives every deployed site (you don't configure these)
 
 | Service | How your code uses it |
 |---|---|
-| Postgres database (per app) | `process.env.DATABASE_URL` |
+| Postgres database (per app, isolated) | `process.env.DATABASE_URL` |
 | Local Gemma 2B chatbot | `http://127.0.0.1:11434` (Ollama API) |
-| Public HTTPS via Cloudflare | `process.env.ORIGIN` (your site's full URL) |
+| Public HTTPS via Cloudflare | `process.env.ORIGIN` |
 | Server port | `process.env.PORT` |
 
 ### Sending email from your app
 
-Your app does NOT send mail directly. It calls the platform's mail proxy with the same `dp_…` API key you used to deploy:
+Your app does NOT send mail directly. It calls the platform's mail proxy with the same `dp_…` API key:
 
 ```bash
 curl -X POST https://deploy.21mv.com/api/v1/mail/send \
@@ -89,23 +123,25 @@ curl -X POST https://deploy.21mv.com/api/v1/mail/send \
   -d '{"to":"someone@example.com","subject":"Hello","html":"<p>Hi from my app</p>"}'
 ```
 
-The platform sends the mail through its own verified sender domains (`21mv.com`, `3ava.com`, etc.) on your app's behalf. You never need a separate mail key, and you never have to verify your own sending domain. Returns `{ "ok": true, "provider_id": "...", "status": "queued" }` on success.
+The platform sends through verified domains (`21mv.com`, `3ava.com`, etc.) on your app's behalf. You never need a separate mail key, and you never have to verify your own sending domain. Returns `{"ok":true,"provider_id":"...","status":"queued"}` on success.
 
-## Example prompts your kid (or anyone) can give the AI assistant
+## Why a SKILL, not a TEMPLATE?
 
-Once the skill is installed and you have a key:
+A template gives starter code. A skill teaches the AI assistant the **pattern** — design tokens, build sequence, common gotchas, mail flow, chatbot flow, the verification checklist — so when a kid says *"build me a site for my D&D campaign"* the assistant adapts the pattern to that specific brief instead of dumping a generic template on them.
 
-> *"Build me a directory of skate parks in California with a contact form. Use the build-vercel-clone-site skill. Here's my deploy key: `dp_…`"*
+The skill encodes ~40 hours of trial-and-error. Whoever uses it gets the lessons free.
 
-> *"I want a one-page site for my soccer team — schedule, roster, contact form for new player tryouts. Use the build skill, name it `<teamname>.21mv.com`."*
+## Free models that work well with this skill
 
-> *"Revive cstandt.com from archive.org as a Colorado-Springs gymnastics directory. Use the skill."*
+The skill is written for sequential, deterministic builds, so even smaller free models do well:
 
-The assistant reads the skill, asks a few clarifying questions (sport scope, color palette, catalog size), then fans out 9 sub-agents that build the whole site in parallel and deploy it. You watch live URLs appear.
+- **Qwen 2.5 Coder 32B** (free on OpenRouter / local) — best for SvelteKit code
+- **DeepSeek-V2.5** (free on DeepSeek API) — great reasoning, fast
+- **Gemini 2.0 Flash** (free on Google AI Studio) — solid all-rounder
+- **Llama 3.1 70B Instruct** (free on Groq / local) — works fine
+- **Local: Qwen 2.5 7B / Gemma 2 9B** — if you have a decent laptop
 
-## What if I want to run my OWN platform?
-
-The hosted platform at `deploy.21mv.com` is one specific deployment. The platform source itself is a SvelteKit app — you can run your own copy and point the skill at your URL by editing the `deploy.21mv.com` reference in `SKILL.md` to your own host.
+Avoid the smallest models (under 7B) — they struggle with longer context and multi-file consistency.
 
 ## License
 
@@ -113,4 +149,8 @@ MIT. Remix freely.
 
 ## Contributing
 
-Pull requests welcome. New skills (e.g. `revive-expired-domain`, `niche-research`, `seo-audit`) are a great fit for this repo as separate top-level directories alongside `build-vercel-clone-site/`.
+Pull requests welcome. Ideas for more skills in this repo:
+- `revive-expired-domain` — wraps the archive.org → modern site flow into a reusable pattern
+- `niche-research` — drives parallel web-search agents for directory cataloging
+- `seo-audit` — runs a checklist against any deployed site
+- `kid-friendly-color-picker` — turns a vibe word into a complete palette
