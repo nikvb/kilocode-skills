@@ -1,28 +1,28 @@
 ---
 name: build-vercel-clone-site
 description: |
-  Build, deploy, and operate a niche-specific website (directory, lead-gen, expired-domain revival,
-  hotel/camp/restaurant/SaaS) on the user's self-hosted vercel-clone platform at {{PLATFORM_HOSTNAME}}.
-  Stack: SvelteKit 2 + Svelte 4 + Tailwind v4 + lucide-svelte + Postgres (per-app) + optional
-  Ollama (gemma2:2b) chatbot + 3ava.com transactional mail. Includes the full design-token
-  pattern, parallel agent fanout strategy, deploy lifecycle, and the platform's known bugs +
-  workarounds. Use whenever the user asks to "build a website", "deploy on the platform",
-  "revive a domain", "add a CRM", "add a chatbot", or work on cstandt.com / campscout / areghotel.
+  Build and deploy production-quality niche websites — directories, lead-gen sites,
+  expired-domain revivals, hotels, camps, restaurants, SaaS — to the hosted vercel-clone
+  platform at https://deploy.21mv.com. Each deploy lands on a {subdomain}.21mv.com URL
+  with its own Postgres, host networking, nginx vhost, and inherited transactional-email
+  + chatbot wiring. Stack: SvelteKit 2 + Svelte 4 + Tailwind v4 + lucide-svelte + Postgres
+  + Ollama (gemma2:2b) for the chatbot + 3ava.com for transactional mail. The platform
+  injects MAIL_API_KEY, OLLAMA_BASE, and per-app DATABASE_URL automatically — your app
+  code just reads process.env. Use whenever someone asks to "build a website", "deploy
+  on the platform", "revive a domain", "add a CRM", or "add a chatbot".
 trigger: |
-  - User mentions building/deploying a new site on their domains ({{BASE_DOMAIN}}, cstandt.com, amdy.io
-    is FORBIDDEN, or any domain in their portfolio)
-  - User wants to use the vercel-clone platform (POST /api/v1/deploy)
+  - User mentions building/deploying a new site
+  - User wants to use the platform (POST /api/v1/deploy)
   - User asks for a directory / lead-gen / revival site in any niche
-  - User mentions Gemma, 3ava.com mail, or platform deploy bugs
-  - User is editing ~/vercel-clone, ~/your-projects/<sister-app>, ~/your-projects/<your-app>, or a sister project
+  - User mentions adding a chatbot or transactional email to a site
+  - User is editing ~/your-projects/<project>/ for a SvelteKit app to deploy
 when_to_skip: |
-  - User wants frontend work that has nothing to do with the platform (e.g. a Vite SPA they'll deploy elsewhere)
+  - User wants frontend work that won't be deployed on this platform (e.g. a Vite SPA going to GitHub Pages)
   - User is only asking general programming questions
-  - User is doing infrastructure work on a different host
+  - User wants to set up their OWN platform (not use this hosted one) — see the README for that path
 required_secrets:
-  - PLATFORM_API_KEY     # bearer token for {{PLATFORM_HOSTNAME}} — prefix dp_…
-  - MAIL_API_KEY         # bearer for {{MAIL_HOST}} — prefix am_…
-  - SSH_HOST             # {{PLATFORM_HOST}} (default) — change if user moved the platform
+  - PLATFORM_API_KEY     # bearer token for deploy.21mv.com — prefix dp_… — ASK USER if not provided
+                         # everything else (MAIL_API_KEY, OLLAMA, DATABASE_URL) is injected by the platform
 ---
 
 # Build & deploy a niche site on the vercel-clone platform
@@ -36,9 +36,9 @@ platform. It also documents the bugs we hit and the workarounds.
 If the user asks for any of the things in `trigger` above, take these steps in order:
 
 1. **Ask for the API keys you don't have.** This skill never hardcodes keys. Always:
-   - Ask for `PLATFORM_API_KEY` (the `dp_…` token for `{{PLATFORM_HOSTNAME}}`) before any deploy.
-   - Ask for `MAIL_API_KEY` (the `am_…` token for `{{MAIL_HOST}}`) before wiring lead-email.
-   - SSH host defaults to `root@{{PLATFORM_HOST}}`. Confirm if user mentions a different host.
+   - Ask for `PLATFORM_API_KEY` (the `dp_…` token for `deploy.21mv.com`) before any deploy.
+   - Ask for `MAIL_API_KEY` (the `am_…` token for `mail.3ava.com`) before wiring lead-email.
+   - SSH host defaults to `root@152.53.194.247`. Confirm if user mentions a different host.
 2. **Read user memory** — `~/.claude/projects/<project>/memory/MEMORY.md` for cross-session
    context (Resend-clone existence, domain portfolio, prior project state).
 3. **Confirm the niche + scope** with one round of `AskUserQuestion`:
@@ -47,14 +47,14 @@ If the user asks for any of the things in `trigger` above, take these steps in o
    - Catalog / content size for MVP.
    - Listing depth (minimal / standard / rich).
 4. **Pick a brand palette + type** distinct from any sibling sites you've already built
-   on the user's platform. Check existing sites first: `https://<your-app>.{{BASE_DOMAIN}}`
-   (pine + sun), `https://<sister-app>.{{BASE_DOMAIN}}` (oxblood + sun-gold). Don't duplicate.
+   on the user's platform. Check existing sites first: `https://campscout.21mv.com`
+   (pine + sun), `https://areghotel.21mv.com` (oxblood + sun-gold). Don't duplicate.
 
 ## Hard rules (NEVER violate)
 
 - **`amdy.io` is production for AMD servers. Do not deploy to it, touch its DNS, or use it
   as a test target.** The codebase has historical `amdy.io` defaults — they are wrong.
-  Always set `BASE_DOMAIN={{BASE_DOMAIN}}` (or another non-amdy domain).
+  Always set `BASE_DOMAIN=21mv.com` (or another non-amdy domain).
 - **Never hardcode API keys in source.** Read from `process.env.MAIL_API_KEY` etc.
   The `mail.ts` abstraction in `src/lib/server/mail.ts` is gated on env vars and
   silently no-ops if missing.
@@ -68,12 +68,12 @@ If the user asks for any of the things in `trigger` above, take these steps in o
 ```
    ┌────────────────────────────────────────────┐
    │  Cloudflare (proxied DNS, free tier)       │
-   │  - {{BASE_DOMAIN}} zone (your wildcard target)    │
+   │  - 21mv.com zone (your wildcard target)    │
    │  - 3ava.com (mail), other portfolio zones  │
    └──────────────────┬─────────────────────────┘
                       │ HTTPS
    ┌──────────────────┴─────────────────────────┐
-   │  {{PLATFORM_HOST}} (Netcup VPS)               │
+   │  152.53.194.247 (Netcup VPS)               │
    │  ┌─────────────────────────────────────┐   │
    │  │  nginx (host) — vhost per deploy    │   │
    │  └────────┬────────────────────────────┘   │
@@ -101,7 +101,7 @@ If the user asks for any of the things in `trigger` above, take these steps in o
    └─────────────────────────────────────────────┘
 ```
 
-The platform deploys ONLY to subdomains under its `BASE_DOMAIN` (currently `{{BASE_DOMAIN}}`).
+The platform deploys ONLY to subdomains under its `BASE_DOMAIN` (currently `21mv.com`).
 To put a site on a different domain (e.g. `cstandt.com`) requires manual nginx vhost
 + DNS A record after the deploy completes — this is NOT automated.
 
@@ -300,9 +300,9 @@ This is THE pattern. It produced Campscout in one session.
 ## Platform deploy lifecycle
 
 ```bash
-PLATFORM='https://{{PLATFORM_HOSTNAME}}'
+PLATFORM='https://deploy.21mv.com'
 AUTH="Authorization: Bearer $PLATFORM_API_KEY"
-ORIGIN='Origin: https://{{PLATFORM_HOSTNAME}}'   # REQUIRED — SvelteKit CSRF rejects multipart POST without it
+ORIGIN='Origin: https://deploy.21mv.com'   # REQUIRED — SvelteKit CSRF rejects multipart POST without it
 
 # List existing
 curl -s -H "$AUTH" "$PLATFORM/api/v1/deployments"
@@ -320,16 +320,16 @@ curl -s -X POST --max-time 300 \
 # ~100s but server keeps building — verify by re-listing deployments.
 
 # Verify
-curl -sL "https://<subdomain>.{{BASE_DOMAIN}}/api/health"
+curl -sL "https://<subdomain>.21mv.com/api/health"
 ```
 
 Container env (set automatically by deployer):
 ```
 DATABASE_URL=postgresql://u_<id>:<pw>@127.0.0.1:5432/app_<id>
-ORIGIN=https://<subdomain>.{{BASE_DOMAIN}}
+ORIGIN=https://<subdomain>.21mv.com
 PORT=<allocated, e.g. 10007>
 MAIL_API_KEY=<from platform .env>
-MAIL_API_BASE=<from platform .env, e.g. https://{{MAIL_HOST}}/api>
+MAIL_API_BASE=<from platform .env, e.g. https://mail.3ava.com/api>
 ADMIN_EMAIL=<from platform .env>
 MAIL_FROM=<from platform .env, e.g. "Brand <hello@verified-domain.com>">
 ```
@@ -338,11 +338,11 @@ Container uses `NetworkMode: 'host'` so:
 - App listens on `0.0.0.0:${PORT}` directly on host
 - Can reach Postgres at `127.0.0.1:5432`
 - Can reach Ollama at `127.0.0.1:11434`
-- Has working host DNS for outbound to {{MAIL_HOST}} etc.
+- Has working host DNS for outbound to mail.3ava.com etc.
 
 ## 3ava.com mail integration (Resend-compatible)
 
-Endpoint: `POST https://{{MAIL_HOST}}/api/emails`
+Endpoint: `POST https://mail.3ava.com/api/emails`
 
 Auth: `Authorization: Bearer <MAIL_API_KEY>` (key prefix `am_…`)
 
@@ -361,7 +361,7 @@ Response: `{ "id": "...", "status": "queued" }` on success.
 
 The `from` domain MUST be verified on the user's 3ava account. Check verified domains:
 ```bash
-curl -s -H "Authorization: Bearer $MAIL_API_KEY" https://{{MAIL_HOST}}/api/domains
+curl -s -H "Authorization: Bearer $MAIL_API_KEY" https://mail.3ava.com/api/domains
 ```
 
 Pick a verified domain or ask the user to verify a new one before changing `MAIL_FROM`.
@@ -371,7 +371,7 @@ Default to `Brand <hello@3ava.com>` unless the user specifies otherwise.
 `mail.ts` pattern (copy this verbatim, gated on env):
 ```ts
 const KEY  = process.env.MAIL_API_KEY;
-const BASE = (process.env.MAIL_API_BASE || 'https://{{MAIL_HOST}}/api').replace(/\/+$/, '');
+const BASE = (process.env.MAIL_API_BASE || 'https://mail.3ava.com/api').replace(/\/+$/, '');
 const FROM = process.env.MAIL_FROM || 'Brand <hello@3ava.com>';
 
 export async function sendMail(p: { to: string|string[]; subject: string; html: string; reply_to?: string }) {
@@ -500,16 +500,16 @@ done
       `BreadcrumbList`
 - [ ] FAQPage JSON-LD on `/faq` if applicable
 - [ ] `POST /api/leads` returns 201; row appears in `leads` table; if `MAIL_API_KEY`
-      configured, two real sends appear in `GET https://{{MAIL_HOST}}/api/emails?limit=3`
+      configured, two real sends appear in `GET https://mail.3ava.com/api/emails?limit=3`
 - [ ] `POST /api/chat` streams NDJSON; assistant grounded in catalog (no hallucinations)
 - [ ] `npm run check` clean (or no NEW errors versus baseline)
 
 ## Mapping a custom domain (e.g. cstandt.com → campscout container)
 
-The platform only auto-provisions `*.{{BASE_DOMAIN}}`. For a custom domain:
+The platform only auto-provisions `*.21mv.com`. For a custom domain:
 
 1. **Cloudflare A record**: in the target domain's CF zone, add `@` and `www` A records
-   pointing to `{{PLATFORM_HOST}}`, proxied. Or wildcard if you want all subdomains
+   pointing to `152.53.194.247`, proxied. Or wildcard if you want all subdomains
    inherited.
 2. **nginx vhost**: SSH and add a vhost in `/etc/nginx/sites-available/<custom-domain>`
    that proxies to the same `127.0.0.1:<port>` as the platform-managed vhost. Use the
@@ -538,10 +538,10 @@ default to haiku for simple work."
 
 ## Reference projects on this platform
 
-- **`~/your-projects/<sister-app>/`** → `https://<sister-app>.{{BASE_DOMAIN}}` — Yerevan hotel
+- **`~/your-projects/<reference-project>/`** → `https://areghotel.21mv.com` — Yerevan hotel
   revival from archive.org 2019 snapshots. Palette: oxblood + sun-gold on cream.
   Type: Fraunces + Public Sans + Playfair italic.
-- **`~/your-projects/<your-app>/`** → `https://<your-app>.{{BASE_DOMAIN}}` — worldwide kids' summer
+- **`~/your-projects/<your-project>/`** → `https://campscout.21mv.com` — worldwide kids' summer
   camp directory with lead-gen CRM. Palette: pine + sun + ember on cream.
   Type: Bricolage Grotesque + Figtree + Fraunces italic. 25 seeded camps + chatbot.
 
