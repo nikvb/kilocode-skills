@@ -4,12 +4,13 @@ description: |
   Build and deploy production-quality niche websites — directories, lead-gen sites,
   expired-domain revivals, hotels, camps, restaurants, SaaS — to the hosted vercel-clone
   platform at https://deploy.21mv.com. Each deploy lands on a {subdomain}.21mv.com URL
-  with its own Postgres, host networking, nginx vhost, and inherited transactional-email
-  + chatbot wiring. Stack: SvelteKit 2 + Svelte 4 + Tailwind v4 + lucide-svelte + Postgres
-  + Ollama (gemma2:2b) for the chatbot + 3ava.com for transactional mail. The platform
-  injects MAIL_API_KEY, OLLAMA_BASE, and per-app DATABASE_URL automatically — your app
-  code just reads process.env. Use whenever someone asks to "build a website", "deploy
-  on the platform", "revive a domain", "add a CRM", or "add a chatbot".
+  with its own Postgres + host networking + nginx vhost. Stack: SvelteKit 2 + Svelte 4
+  + Tailwind v4 + lucide-svelte + Postgres + Ollama (gemma2:2b) for chatbots. Apps DO
+  NOT send mail directly — they call the platform's mediated POST /api/v1/mail/send
+  endpoint with their dp_… deploy key, and the platform forwards through its own 3ava
+  account on their behalf using a verified sender domain (21mv.com / 3ava.com / etc.).
+  Use whenever someone asks to "build a website", "deploy on the platform", "revive a
+  domain", "add a CRM", or "add a chatbot".
 trigger: |
   - User mentions building/deploying a new site
   - User wants to use the platform (POST /api/v1/deploy)
@@ -22,7 +23,9 @@ when_to_skip: |
   - User wants to set up their OWN platform (not use this hosted one) — see the README for that path
 required_secrets:
   - PLATFORM_API_KEY     # bearer token for deploy.21mv.com — prefix dp_… — ASK USER if not provided
-                         # everything else (MAIL_API_KEY, OLLAMA, DATABASE_URL) is injected by the platform
+                         # this same key authenticates BOTH /api/v1/deploy AND /api/v1/mail/send
+                         # the platform owns the 3ava mail key + verified sender domains; clients never see them
+                         # DATABASE_URL is auto-injected per-app; OLLAMA is at 127.0.0.1:11434 on host
 ---
 
 # Build & deploy a niche site on the vercel-clone platform
@@ -37,7 +40,6 @@ If the user asks for any of the things in `trigger` above, take these steps in o
 
 1. **Ask for the API keys you don't have.** This skill never hardcodes keys. Always:
    - Ask for `PLATFORM_API_KEY` (the `dp_…` token for `deploy.21mv.com`) before any deploy.
-   - Ask for `MAIL_API_KEY` (the `am_…` token for `mail.3ava.com`) before wiring lead-email.
    - SSH host defaults to `root@152.53.194.247`. Confirm if user mentions a different host.
 2. **Read user memory** — `~/.claude/projects/<project>/memory/MEMORY.md` for cross-session
    context (Resend-clone existence, domain portfolio, prior project state).
@@ -55,7 +57,7 @@ If the user asks for any of the things in `trigger` above, take these steps in o
 - **`amdy.io` is production for AMD servers. Do not deploy to it, touch its DNS, or use it
   as a test target.** The codebase has historical `amdy.io` defaults — they are wrong.
   Always set `BASE_DOMAIN=21mv.com` (or another non-amdy domain).
-- **Never hardcode API keys in source.** Read from `process.env.MAIL_API_KEY` etc.
+- **Never hardcode API keys in source.** Apps store their own `PLATFORM_API_KEY` (the dp_… deploy key) — that single key is also the auth for the platform mail proxy.
   The `mail.ts` abstraction in `src/lib/server/mail.ts` is gated on env vars and
   silently no-ops if missing.
 - **Never echo a secret back to the user** in a final message. Acknowledge receipt,
@@ -328,68 +330,72 @@ Container env (set automatically by deployer):
 DATABASE_URL=postgresql://u_<id>:<pw>@127.0.0.1:5432/app_<id>
 ORIGIN=https://<subdomain>.21mv.com
 PORT=<allocated, e.g. 10007>
-MAIL_API_KEY=<from platform .env>
-MAIL_API_BASE=<from platform .env, e.g. https://mail.3ava.com/api>
-ADMIN_EMAIL=<from platform .env>
-MAIL_FROM=<from platform .env, e.g. "Brand <hello@verified-domain.com>">
 ```
+
+That's it. **Apps do not get a 3ava mail key, an Ollama URL config, or any other
+shared platform secret.** Mail goes through the platform's mediated endpoint
+(see below); Ollama is reachable at the well-known localhost address; everything
+else the app needs to do, it does on its own.
 
 Container uses `NetworkMode: 'host'` so:
 - App listens on `0.0.0.0:${PORT}` directly on host
 - Can reach Postgres at `127.0.0.1:5432`
 - Can reach Ollama at `127.0.0.1:11434`
-- Has working host DNS for outbound to mail.3ava.com etc.
+- Has working host DNS for outbound calls
 
-## 3ava.com mail integration (Resend-compatible)
+## Sending mail (the platform sends, not your app)
 
-Endpoint: `POST https://mail.3ava.com/api/emails`
+**Apps do NOT have their own 3ava key and CANNOT send email directly.** The platform
+holds the only mail key, owns the verified sender domains (`21mv.com`, `3ava.com`,
+`amdy.io`, etc.), and exposes a single mediated endpoint:
 
-Auth: `Authorization: Bearer <MAIL_API_KEY>` (key prefix `am_…`)
+```
+POST https://deploy.21mv.com/api/v1/mail/send
+Authorization: Bearer <PLATFORM_API_KEY>     # the same dp_… you used to deploy
+Content-Type: application/json
 
-Body (Resend shape):
-```json
 {
-  "from": "Brand <hello@verified-domain.com>",
-  "to": ["recipient@example.com"],
-  "subject": "...",
-  "html": "<p>...</p>",
-  "reply_to": "user@example.com"
+  "to": "user@example.com",                  // string OR array of strings
+  "subject": "Subject line",
+  "html": "<p>HTML body</p>",
+  "reply_to": "optional-reply-to@example.com"
 }
 ```
 
-Response: `{ "id": "...", "status": "queued" }` on success.
+Response on success: `201 { "ok": true, "provider_id": "...", "status": "queued" }`.
 
-The `from` domain MUST be verified on the user's 3ava account. Check verified domains:
-```bash
-curl -s -H "Authorization: Bearer $MAIL_API_KEY" https://mail.3ava.com/api/domains
-```
+The platform fills in `from` (currently `21mv.com <noreply@21mv.com>`), forwards
+to 3ava with its own key, and logs the send. You don't pick the sender domain,
+verify domains, or rotate keys — that's the platform's job.
 
-Pick a verified domain or ask the user to verify a new one before changing `MAIL_FROM`.
-Common verified domains as of 2026-04: `3ava.com`, `724vacation.com`, `hi2b.com`, `amdy.io`.
-Default to `Brand <hello@3ava.com>` unless the user specifies otherwise.
+**App code pattern** (when your app's `/api/leads` or contact handler wants to
+notify someone):
 
-`mail.ts` pattern (copy this verbatim, gated on env):
 ```ts
-const KEY  = process.env.MAIL_API_KEY;
-const BASE = (process.env.MAIL_API_BASE || 'https://mail.3ava.com/api').replace(/\/+$/, '');
-const FROM = process.env.MAIL_FROM || 'Brand <hello@3ava.com>';
+// $lib/server/mail.ts
+const PLATFORM = 'https://deploy.21mv.com';
+const KEY = process.env.PLATFORM_API_KEY; // app stores its own dp_… key as a secret
 
-export async function sendMail(p: { to: string|string[]; subject: string; html: string; reply_to?: string }) {
-  if (!KEY) { console.log('[mail] skipped (no key)'); return { sent: false, reason: 'no key' }; }
-  const r = await fetch(`${BASE}/emails`, {
+export async function sendMail(p: { to: string | string[]; subject: string; html: string; reply_to?: string }) {
+  if (!KEY) { console.log('[mail] skipped (PLATFORM_API_KEY unset)'); return { sent: false }; }
+  const r = await fetch(`${PLATFORM}/api/v1/mail/send`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: FROM,
-      to: Array.isArray(p.to) ? p.to : [p.to],
-      subject: p.subject, html: p.html, reply_to: p.reply_to
-    })
+    body: JSON.stringify(p)
   });
-  if (!r.ok) return { sent: false, reason: `HTTP ${r.status}` };
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    console.error('[mail] platform returned', r.status, text.slice(0, 200));
+    return { sent: false, reason: `HTTP ${r.status}` };
+  }
   const j = await r.json();
-  return { sent: true, provider_id: j?.id };
+  return { sent: true, provider_id: j?.provider_id };
 }
 ```
+
+`PLATFORM_API_KEY` must be passed to the app at deploy time as a custom env var,
+or the app simply doesn't send mail (it'll log skip and continue). The platform
+doesn't auto-inject it — apps that want mail must explicitly request it.
 
 ## Ollama chatbot integration (RAG)
 
@@ -499,8 +505,11 @@ done
 - [ ] JSON-LD on item detail: niche-specific schema (Hotel/SportsActivityLocation/etc) +
       `BreadcrumbList`
 - [ ] FAQPage JSON-LD on `/faq` if applicable
-- [ ] `POST /api/leads` returns 201; row appears in `leads` table; if `MAIL_API_KEY`
-      configured, two real sends appear in `GET https://mail.3ava.com/api/emails?limit=3`
+- [ ] `POST /api/leads` returns 201; row appears in `leads` table. If your app calls
+      the platform mail proxy (`POST https://deploy.21mv.com/api/v1/mail/send` with the
+      `dp_…` key), the response body has a `provider_id` UUID — that means the platform
+      successfully forwarded the message to 3ava. Mail can also be cross-checked from
+      the platform host with `curl -H "Authorization: Bearer $MAIL_API_KEY" "https://mail.3ava.com/api/emails?limit=3"` (this command runs ON the platform host using the platform's own key — not from your app).
 - [ ] `POST /api/chat` streams NDJSON; assistant grounded in catalog (no hallucinations)
 - [ ] `npm run check` clean (or no NEW errors versus baseline)
 

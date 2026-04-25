@@ -74,10 +74,22 @@ That's it. Your assistant takes it from there: builds the site, packages it, POS
 | Service | How your code uses it |
 |---|---|
 | Postgres database (per app) | `process.env.DATABASE_URL` |
-| Transactional email via [3ava.com](https://mail.3ava.com) | `process.env.MAIL_API_KEY`, `process.env.MAIL_API_BASE`, `process.env.MAIL_FROM` |
 | Local Gemma 2B chatbot | `http://127.0.0.1:11434` (Ollama API) |
 | Public HTTPS via Cloudflare | `process.env.ORIGIN` (your site's full URL) |
 | Server port | `process.env.PORT` |
+
+### Sending email from your app
+
+Your app does NOT send mail directly. It calls the platform's mail proxy with the same `dp_…` API key you used to deploy:
+
+```bash
+curl -X POST https://deploy.21mv.com/api/v1/mail/send \
+  -H 'Authorization: Bearer dp_…' \
+  -H 'Content-Type: application/json' \
+  -d '{"to":"someone@example.com","subject":"Hello","html":"<p>Hi from my app</p>"}'
+```
+
+The platform sends the mail through its own verified sender domains (`21mv.com`, `3ava.com`, etc.) on your app's behalf. You never need a separate mail key, and you never have to verify your own sending domain. Returns `{ "ok": true, "provider_id": "...", "status": "queued" }` on success.
 
 ## Example prompts your kid (or anyone) can give the AI assistant
 
