@@ -6,7 +6,19 @@ Agent skills for AI coding assistants — works with **kilocode** (free models!)
 
 ### [`build-vercel-clone-site`](./build-vercel-clone-site/SKILL.md)
 
-**Build any website with one prompt.** Tell your AI assistant what kind of site you want and it'll build it and put it live on the internet at `your-name.21mv.com`.
+**Rebuild any business's old, ugly website into a modern one — and pitch it to them.**
+
+Find a local business with a bad 2010-era site. Paste the URL into kilocode. The AI:
+
+1. Scrapes the existing site for the **real business info** (name, address, phone, services, hours, team)
+2. Picks a modern design that fits the business niche (auto body = bold/industrial, bakery = warm/handmade, dentist = clean/trust)
+3. Builds the new site (~25 SvelteKit + Tailwind v4 files) using the real data — never fabricates
+4. Deploys it live at `{your-pick}.21mv.com`
+5. Hands you a pitch-email template you can send to the business owner
+
+**That's the kid-side service business.** Walk down your street, find an ugly site, rebuild it over the weekend, email the owner with a `https://your-version.21mv.com` URL, charge $300–800 if they want to keep it. Real businesses, real money, real portfolio.
+
+Also works for personal projects (your soccer team, school club, art portfolio, D&D campaign) — same skill, lower stakes.
 
 Designed for **kids and beginners using kilocode with FREE models** (Qwen 2.5, DeepSeek-V2.5, Gemini Flash, local Llama 3.1). No credit card. The AI builds the site on your computer, then asks for your platform API key and deploys it for you.
 

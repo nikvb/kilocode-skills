@@ -1,19 +1,25 @@
 ---
 name: build-vercel-clone-site
 description: |
-  Build a real website with one prompt — restaurants, sports teams, school clubs,
-  portfolios, photographers, online stores, local businesses, directories,
-  expired-domain revivals, anything. Designed for kids and beginners using
-  kilocode with FREE models (Qwen, DeepSeek, Gemini Flash, local Llama). The
-  skill walks the model through a step-by-step build of a SvelteKit + Tailwind
-  v4 site, then deploys it to https://deploy.21mv.com — the kid only needs ONE
-  API key (their dp_… deploy key) to get a live URL at {their-name}.21mv.com.
-  No server, no email setup, no DNS — the platform handles everything.
+  Rebuild a real business's website from scratch — modern, fast, mobile-friendly —
+  starting from their existing ugly site (or an archive.org snapshot, or just
+  the business name). The primary use case: a kid finds a local business with
+  a bad 2010-era website, hands the URL to this skill, and gets back a modern
+  spec-quality replacement deployed live at {kid-pick}.21mv.com — which they
+  can then send to the business owner as a sales pitch ("look what your site
+  could look like — I made it for you over the weekend"). Also works for
+  personal projects (sports teams, school clubs, portfolios), but the design
+  bar and prompts assume real-world business stakes. Built for kilocode +
+  free models. SvelteKit 2 + Svelte 4 + Tailwind v4 stack, locked. Deploys
+  to https://deploy.21mv.com with a single dp_… API key.
 trigger: |
+  - User shows you an existing business URL and says "rebuild this" / "modernize this"
+    / "make a new version" / "make this look like 2026"
+  - User mentions a local business with a bad website they want to redo as a pitch
+  - User wants to revive an expired domain (pull old content from archive.org, modernize)
   - User wants to build a website (any kind: restaurant, blog, portfolio, store,
     directory, team page, school project, fan site, landing page, anything)
   - User mentions deploying on 21mv.com / the platform / "the deploy server"
-  - User asks to revive an expired domain
   - User asks to add a chatbot, contact form, or email notifications
   - User is editing a SvelteKit project they want to put online
 when_to_skip: |
@@ -30,12 +36,27 @@ required_secrets:
                          # OLLAMA is at 127.0.0.1:11434 on the host
 ---
 
-# Build any website with one prompt — kid-friendly edition
+# Modernize any business website — kid-friendly edition
 
 A skill for AI assistants (kilocode, Claude Code, Cursor, with any free or paid
-model) that builds and deploys a real website on the hosted vercel-clone
-platform at `https://deploy.21mv.com`. Designed so a 12-year-old can say
-*"build me a site for my soccer team"* and walk away with a live URL.
+model) that takes an old, ugly business website and produces a modern, fast,
+mobile-friendly replacement — deployed live at `{kid-pick}.21mv.com` so the
+kid can send the URL to the business owner as a pitch demo.
+
+**The primary use case** (the one that pays):
+
+> Kid is walking down their street. Sees a sign for "Mike's Auto Body —
+> mikesautobody.com". Visits the site. It looks like 2009 — three columns
+> of clip art, a phone number in Comic Sans, no mobile view. Kid pastes
+> the URL into kilocode and says *"rebuild this site, modern, deploy as
+> mikes-auto-body.21mv.com"*. AI scrapes the existing site for the real
+> business info (name, phone, services, hours), discards the bad design,
+> picks a modern aesthetic that fits an auto-body shop, builds 6-8 pages,
+> deploys. Kid emails Mike: *"Hi Mike, I made you this — what do you
+> think? https://mikes-auto-body.21mv.com"*. Mike calls back.
+
+That's the workflow. Personal-site builds (school clubs, sports teams, art
+portfolios) also work — they're just lower-stakes versions of the same flow.
 
 The skill works in two modes:
 - **Sequential**: one model, one step at a time. Works with cheap/free models
@@ -227,56 +248,148 @@ Both go to the AI before any code is written.
 
 ## The 60-second pitch
 
-The kid types ONE prompt. The AI:
+The kid pastes an existing business URL (or just describes the business). The AI:
 
-1. Asks them 5 short questions about what they want
-2. Picks a design palette + fonts that fit their answer
-3. Builds a SvelteKit + Tailwind v4 site (about 25 files)
-4. Tars it up
-5. POSTs to `https://deploy.21mv.com/api/v1/deploy`
-6. Returns the live URL: `https://{theirpick}.21mv.com`
+1. **Researches the existing site** — scrapes the homepage + a few key pages,
+   pulls out real facts (business name, address, phone, services, hours, team,
+   prices), notes what's bad about the current design (ugly fonts, broken
+   mobile, no SSL, slow images, missing modern features)
+2. **Asks 4 short questions** to fill the gaps
+3. **Picks a modern aesthetic** that matches the business niche (auto body =
+   industrial + bold; bakery = warm + handmade; law firm = quiet + premium)
+4. **Builds a SvelteKit + Tailwind v4 site** (~25 files) using the real
+   business data — never invents addresses, never makes up prices, never uses
+   placeholder copy
+5. **Deploys via `POST /api/v1/deploy`** to `{kid-pick}.21mv.com`
+6. **Hands the kid the URL + a pitch email template** for the business owner
 
-Total time: ~10–15 minutes with a free model, ~3–5 minutes with parallel agents.
+Total time: ~10–15 min with a free model, ~3–5 min with parallel agents.
+
+If the kid is building a personal site (no existing business), skip step 1;
+the rest is identical.
 
 ---
 
-## STEP 1 — The 5-minute first conversation
+## STEP 0 — Research the existing site (skip if pure personal project)
 
-Before writing a single line of code, ask the kid these five questions in order.
-Use AskUserQuestion (or just plain text in tools that don't have it). **Do not skip**
-— the answers are what makes the site theirs and not generic AI slop.
+If the kid gave you an existing URL, **research it before doing anything else**.
+This is what separates a real rebuild from generic AI output.
 
-1. **"What's the site for?"** — pick an industry from the list below, or describe
-   it in a sentence. (Restaurant, sports team, school club, portfolio, online
-   store, blog, photographer, hotel, charity, event, directory, fan site, …)
+```bash
+# Pull the existing homepage
+curl -sL --max-time 15 -A 'Mozilla/5.0' "<existing-url>" -o /tmp/old-site.html
 
-2. **"Who's it for?"** — pick the main audience. (Parents, classmates, fans,
-   customers, people in my city, anyone on the internet, …) Keeps tone right.
+# Pull a few common subpages if they exist
+for p in /about /contact /menu /services /pricing /book /reservations; do
+  curl -sL --max-time 10 -A 'Mozilla/5.0' "<existing-url>$p" -o "/tmp/old$(echo $p | tr / _).html" 2>/dev/null
+done
+```
 
-3. **"What 3 things do you want visitors to do?"** — pick the top 3 actions:
-   `book a table`, `email me`, `read my posts`, `buy a thing`, `find a class`,
-   `download my résumé`, `watch a video`, `donate`, `RSVP`, `subscribe`, etc.
-   Each becomes a CTA on the site.
+If the domain is **expired or returns parking-page garbage**, hit archive.org:
 
-4. **"What's the vibe?"** — pick 2–3 words: `playful, bright, friendly` /
-   `professional, calm, modern` / `cozy, warm, handmade` / `bold, edgy, loud` /
-   `quiet, premium, refined` / `nature, earthy, outdoor` / `retro, 80s, neon`.
-   This drives the palette.
+```bash
+# Find the most recent good snapshot (filter status 200)
+curl -s "https://web.archive.org/cdx/search/cdx?url=<domain>&filter=statuscode:200&collapse=digest&output=json&limit=-10"
 
-5. **"What's the URL name?"** — they pick the subdomain. Letters and dashes only,
-   3–63 chars. Examples: `tigers-soccer`, `sams-bakery`, `mias-art`, `coachmike`.
-   The site lives at `https://{their-pick}.21mv.com`.
+# Fetch a specific snapshot
+TS=20210101000000  # use a real timestamp from above
+curl -sL --max-time 25 -A 'Mozilla/5.0' "https://web.archive.org/web/${TS}/<original-url>" -o /tmp/archive.html
+```
 
-After they answer, **also ask for any specifics they want included**:
+**Extract these facts** (every one of them goes into your build):
 
-- Specific images (hand them URLs or paths)
-- Specific text (a paragraph they wrote, a quote, an "about me")
-- Specific colors (their team colors, school colors, an existing logo color)
-- Specific contact info (their email, their phone, their school's address)
-- Anything off-limits (no testimonials, no chatbot, no signup form, …)
+| Fact | Where to look |
+|---|---|
+| Legal business name | `<title>`, footer copyright, About page |
+| Year founded / "since YYYY" | About page, "established" callouts, copyright year |
+| Physical address(es) | Contact page, footer, "Find us" |
+| Phone(s) — including separate emergency / fax / mobile | Contact, footer, hero CTAs |
+| Email(s) — note multiple departments separately | Contact, footer, mailto: links |
+| Services offered (the COMPLETE list, not a guess) | Services / Menu / Programs page |
+| Hours of operation, including seasonal differences | Visit / Contact / footer |
+| Pricing — real numbers if visible | Menu, Rates, Pricing, Services |
+| Team members / staff names | About / Team / Doctors / Attorneys page |
+| Years of experience claims | About, "since YYYY" badges, certifications |
+| Awards / certifications | Sidebar badges, About, Footer |
+| Tagline / slogan | Hero, header, "About us" first sentence |
+| Brand voice clues | Tone of About page — formal, folksy, technical, etc. |
+| Photography style | Lobby/storefront photos, food shots, action shots |
+| Logo file (if usable) | `<img src=…logo…>` in nav — save the URL or download |
+| Color palette of the OLD site | What 2-3 colors dominate the existing design? |
+| Social links | Footer, header, "follow us" |
+| Reviews / testimonials with real attribution | Testimonials section |
 
-These go into a section called **"What the kid told us"** in your build notes,
-and you reference it on every page.
+Write these into a research note like `/tmp/<sub>-research.md`. You'll reference
+this on every page you build.
+
+**Also note what's BAD** about the existing site (so you fix it, not preserve it):
+
+- ❌ Mobile view broken / non-existent
+- ❌ No HTTPS
+- ❌ Slow images (uncompressed, not responsive)
+- ❌ Comic Sans / Times New Roman / Papyrus / clip-art icons
+- ❌ Background music (lol)
+- ❌ Hit counter / "best viewed in IE" / Flash
+- ❌ Broken contact form / 2009-era reCAPTCHA
+- ❌ Hard-coded `<table>` layout
+- ❌ Stock photography of people who clearly don't work there
+- ❌ Out-of-date hours, dead phone numbers, expired specials
+- ❌ No structured data, no OG tags, no sitemap, no SEO
+
+Each "bad" item becomes a "good" feature in the rebuild.
+
+**Most important rule**: **never invent business facts**. If the old site
+doesn't say their phone number, ask the kid. If it doesn't list prices,
+say "Pricing — call for quote" instead of fabricating. The pitch fails the
+moment the business owner spots a fake fact.
+
+---
+
+## STEP 1 — The 4-minute first conversation
+
+You've researched (STEP 0). Now ask the kid the gaps. Most of these answers
+fill in things the existing site didn't tell you, OR set the modernization
+direction.
+
+1. **"Is this a live business with an active owner, or an expired/abandoned site?"**
+   - Active business → the kid will pitch the rebuild as a sales demo
+   - Expired/abandoned → the kid is reviving the domain (or building a directory
+     in the same niche). Different ethics; different pitch (no business owner
+     to email).
+   - "Personal project" → skip business research, this is a portfolio/hobby site.
+
+2. **"What's the URL name for the new version?"** — the kid picks the subdomain.
+   Letters and dashes only, 3-63 chars. Examples: `mikes-auto-body`,
+   `morning-glory-bakery`, `harborside-dental`, `tigers-soccer`. The new site
+   lives at `https://{their-pick}.21mv.com`.
+
+3. **"What 3 things should visitors do on the new site?"** — picks the top 3
+   actions: `call now`, `book online`, `request a quote`, `view menu`,
+   `email`, `get directions`, `RSVP`, `donate`, `read reviews`, `see hours`.
+   Each becomes a CTA. Hint at what the existing site DIDN'T let them do
+   (the rebuild's selling point).
+
+4. **"What's the modern vibe for this niche?"** — pick 2-3 words. The
+   business has a category (auto body = industrial + bold; bakery = warm +
+   handmade; dentist = clean + trust + bright; law firm = quiet + premium).
+   Steer toward something modern and category-appropriate, not whatever the
+   ugly old site did.
+
+After answers, ask for **anything specific the kid knows or has**:
+
+- Photos they have permission to use (the business's own photos, not stock)
+- Real testimonials with attribution
+- Updated info that's not on the old site (new services, new hours)
+- Specific colors the business already uses (their truck wrap, their logo)
+- Any "do not include" — sometimes the old site has a feature (e.g. comments,
+  forum, member login) that the rebuild SHOULDN'T have
+
+These go into **"Kid's research notes"** in your build, alongside STEP 0's
+extracted facts. Reference them on every page.
+
+If the kid is doing a **pure personal project** (no existing site), you can
+fall back to the older "5-question convo" — but always ask first whether
+there's an existing source, since most real sales come from rebuilds.
 
 ---
 
@@ -285,22 +398,31 @@ and you reference it on every page.
 Match their answer to one of these patterns. Each gives a default IA, voice, and
 palette starter. **You can mix-and-match** — most real sites are hybrids.
 
-| Industry / use case | Default routes | Voice | Palette starter |
+| Industry / business type | Default routes | Voice | Palette starter |
 |---|---|---|---|
-| **Restaurant / café / bakery** | `/`, `/menu`, `/visit`, `/reserve`, `/about` | warm, sensory, food-forward | terracotta + cream + leaf-green |
-| **Sports team / club** | `/`, `/schedule`, `/roster`, `/news`, `/join` | energetic, proud, local | team-color primary + chalk-white + scoreboard-dark |
-| **School club / class project** | `/`, `/about`, `/projects`, `/members`, `/contact` | clear, friendly, concise | one bold accent + neutrals |
-| **Personal portfolio / résumé** | `/`, `/work`, `/about`, `/writing`, `/contact` | confident, quiet, editorial | one signature color + paper-white + ink |
-| **Photographer / videographer** | `/`, `/galleries`, `/galleries/[slug]`, `/about`, `/book` | image-led, minimal text | full-bleed black/white + accent |
-| **Tutor / coach / lessons** | `/`, `/services`, `/rates`, `/testimonials`, `/book` | encouraging, expert, parent-friendly | trust-blue + warm cream + accent |
+| **Restaurant / café / bakery / pizzeria** | `/`, `/menu`, `/visit`, `/reserve`, `/order`, `/about` | warm, sensory, food-forward | terracotta + cream + leaf-green |
+| **Local contractor (HVAC, plumber, electrician, roofer, gutter, fence)** | `/`, `/services`, `/service-area`, `/about`, `/quote` | direct, no-nonsense, trustworthy | bold primary + steel-gray + safety-yellow accent |
+| **Auto body / mechanic / car detailing / tire shop** | `/`, `/services`, `/before-after`, `/about`, `/quote` | tough, capable, local-pride | industrial gray + shop-orange + black |
+| **Hair salon / barbershop / nail salon / spa** | `/`, `/services`, `/team`, `/gallery`, `/book` | stylish, warm, current | brand color (often pink/sage/mauve) + cream + black |
+| **Dentist / chiropractor / PT / clinic** | `/`, `/services`, `/team`, `/insurance`, `/book` | clean, calm, trustworthy | medical-blue or sage + white + warm accent |
+| **Law office / accountant / CPA (small practice)** | `/`, `/practice-areas`, `/attorneys`, `/insights`, `/contact` | quiet, premium, authoritative | deep navy or charcoal + cream + gold accent |
+| **Real estate agent (solo or small team)** | `/`, `/listings`, `/sold`, `/about`, `/contact` | confident, neighborhood-specific | local-tone neutrals + one strong accent |
+| **Landscaper / lawn care / tree service** | `/`, `/services`, `/portfolio`, `/about`, `/quote` | outdoorsy, capable, seasonal | forest green + earth tones + sun accent |
+| **Tutor / coach / fitness trainer / dance studio** | `/`, `/services`, `/rates`, `/testimonials`, `/book` | encouraging, expert, parent-friendly | trust-blue + warm cream + accent |
+| **Wedding photographer / videographer / planner** | `/`, `/galleries`, `/galleries/[slug]`, `/packages`, `/contact` | image-led, romantic, polished | warm neutrals + film-tone accent |
+| **Yoga / pilates / martial arts / dance studio** | `/`, `/schedule`, `/instructors`, `/intro-offer`, `/contact` | calm or energetic per discipline | studio-specific palette + cream |
+| **Pet groomer / dog walker / vet / boarding** | `/`, `/services`, `/team`, `/gallery`, `/book` | warm, animal-loving, trustworthy | warm primary + cream + soft accent |
+| **Cleaning / moving / handyman service** | `/`, `/services`, `/service-area`, `/about`, `/quote` | direct, dependable, local | bold primary + clean white + trust accent |
+| **Daycare / preschool / tutoring center** | `/`, `/programs`, `/staff`, `/enroll`, `/parents` | warm, safe, parent-trusted | bright friendly primary + soft pastels |
+| **Therapist / counselor (private practice)** | `/`, `/approach`, `/specialties`, `/insurance`, `/book` | quiet, gentle, anti-marketing | muted palette + plenty of whitespace |
+| **Hotel / B&B / vacation rental / Airbnb** | `/`, `/rooms`, `/rooms/[slug]`, `/visit`, `/book` | quiet, premium, place-specific | local stone/wood tones |
 | **Online store (≤30 products)** | `/`, `/shop`, `/shop/[slug]`, `/cart`, `/about` | direct, product-led | brand color + product-neutral |
-| **Blog / newsletter** | `/`, `/posts`, `/posts/[slug]`, `/about`, `/subscribe` | thoughtful, editorial | serif heavy, single accent |
-| **Hotel / B&B / vacation rental** | `/`, `/rooms`, `/rooms/[slug]`, `/visit`, `/book` | quiet, premium, place-specific | local stone/wood tones |
-| **Charity / nonprofit** | `/`, `/mission`, `/programs`, `/stories`, `/donate` | warm, plainspoken, hopeful | mission-driven primary + warm neutrals |
-| **Directory / lead-gen** | `/`, `/{cat}`, `/{cat}/[slug]`, `/search`, `/list-your-X`, `/admin` | informative, scout-like, parent-trusted | depth-color + signal-yellow |
-| **Event landing (party, wedding, festival)** | `/`, `/details`, `/rsvp`, `/photos`, `/faq` | celebratory, specific, single-purpose | event-color theme |
-| **Fan site / hobby community** | `/`, `/fav`, `/posts`, `/links`, `/about` | enthusiastic, personal, niche-specific | playful, saturated |
-| **Expired-domain revival** | depends on what archive.org shows | match the original tone | derived from old logo / old palette |
+| **Charity / nonprofit / religious org** | `/`, `/mission`, `/programs`, `/stories`, `/donate` | warm, plainspoken, hopeful | mission-driven primary + warm neutrals |
+| **Directory / lead-gen** | `/`, `/{cat}`, `/{cat}/[slug]`, `/search`, `/list-your-X`, `/admin` | informative, scout-like, trusted | depth-color + signal-yellow |
+| **Event landing (wedding, festival, conference, fundraiser)** | `/`, `/details`, `/rsvp`, `/photos`, `/faq` | celebratory, specific, single-purpose | event-color theme |
+| **Personal portfolio / résumé** (kid's own) | `/`, `/work`, `/about`, `/writing`, `/contact` | confident, quiet, editorial | one signature color + paper-white + ink |
+| **Sports team / school club / fan site** (kid's own) | `/`, `/schedule`, `/roster`, `/news`, `/join` | energetic, proud, local | team colors + chalk-white + scoreboard-dark |
+| **Expired-domain revival** | depends on what archive.org shows | modernize the original tone | derived from old logo, but updated |
 
 If their answer doesn't fit any of these cleanly, pick the **closest** + tell
 them you're starting from that template and they can correct.
@@ -847,8 +969,99 @@ If your tool doesn't support sub-agents, do them sequentially in this order
 
 ## Appendix A — Kid prompt examples and what to build for each
 
-**1. *"I want a site for my soccer team, the Tigers. Show our schedule and roster."***
-- Industry template: **Sports team**
+The first **5 examples are real-business rebuilds** (the primary use case —
+kid pitches the result to the business owner). The last **5 are personal
+projects** (lower stakes, same skill).
+
+### REAL-BUSINESS REBUILDS (the way to make money with this)
+
+**1. *"Rebuild mikesautobody.com — it looks like 2009. Modern version, deploy as `mikes-auto-body.21mv.com`."***
+- STEP 0: scrape mikesautobody.com → extract: business name "Mike's Auto Body",
+  address "412 Industrial Pkwy, Hartford CT", phone "860-555-0142", services
+  (collision repair, paint, frame, glass), hours "Mon-Fri 8-5 Sat 9-1", established 1987.
+  Note: existing site is table-layout, Comic Sans, no mobile, hit counter, hot-pink "FREE ESTIMATE!" GIF.
+- Industry: **Auto body / mechanic**
+- Palette: industrial gray + shop-orange + near-black (bold, capable)
+- Hero: full-bleed photo of a freshly-repaired car (or a clean shop bay if no
+  good photo exists) + "Hartford collision repair, since 1987"
+- Routes: `/`, `/services`, `/before-after`, `/about`, `/quote` (form → email Mike)
+- Pitch line at handoff: *"Hi Mike, I rebuilt your site over the weekend.
+  See it at mikes-auto-body.21mv.com. If you like it, I can transfer it to
+  your domain for $X. Free estimate!"*
+
+**2. *"morningglorybakery.com is awful. Modernize it as morning-glory-bakery."***
+- STEP 0: scrape → real menu (12 items with prices), real hours, owner's name
+  is in the About page, IG @morningglorybakery has good food photos. The old
+  site uses Wix template from 2016, autoplay video, no menu PDF.
+- Industry: **Restaurant / café / bakery**
+- Palette: warm cream + butter-yellow + leaf-green (cozy + food-forward)
+- Type: Fraunces Variable (display) + Public Sans (body) + Caveat (script accent)
+- Hero: full-bleed photo of pastries (download from their IG with attribution
+  or ask the kid for permission); H1 "Fresh baked daily on Stark Street."
+- Menu page is a long structured list grouped by category, prices in tabular nums
+- `/visit` has a real Leaflet map (NOT Google Maps — GDPR-friendly), hours,
+  parking note, accessibility note
+- Pitch: *"Hi Sarah, I made a new version of your bakery's site. It loads in
+  under 2 seconds, works on phones, and the menu is updated. Take a look:
+  morning-glory-bakery.21mv.com — happy to talk if you'd like to use it."*
+
+**3. *"Family dentist Dr. Chen — current site is a $20 template. Make it premium."***
+- STEP 0: scrape → 3 dentists' names + photos, services list, insurances
+  accepted, address + phone, two locations. Old site has stock photo of someone
+  who is clearly not a dentist, generic "Welcome to our practice" text, no
+  online booking.
+- Industry: **Dentist / clinic**
+- Palette: muted sage + cream + warm gold (clean, trust, premium)
+- Type: Fraunces (display) + Public Sans (body)
+- Hero: real photo of the practice's interior or the team (ask kid to ask Chen);
+  H1 "Family dentistry, careful and unhurried"; sub mentioning the actual town
+- Routes: `/`, `/services`, `/team`, `/insurance`, `/locations`, `/book`
+- `/insurance` is a TABLE of accepted plans (most dental sites mess this up)
+- `/book` has a real form → `/api/leads`; calendar widget if the kid wants
+  to wire one up later
+- Pitch: *"Dr. Chen, parents in town deserve a site that loads fast and works
+  on phones — yours doesn't. Here's a version I built: drchen-dental.21mv.com.
+  $X to make it yours."*
+
+**4. *"My uncle's law office — small firm, immigration + family law. Site is from 2014. Help."***
+- STEP 0: scrape → 2 attorneys, both bar-admitted in NY/NJ, real addresses,
+  practice areas list with subspecialties (DACA, asylum, divorce, custody,
+  prenups). Old site uses an outsourced "law firm template" with stock photos
+  of gavel + lady-justice, no Spanish version even though clientele is bilingual.
+- Industry: **Law office (small practice)**
+- Palette: deep navy + cream + brass-gold (quiet, premium, authoritative)
+- Type: Fraunces or GT Sectra (display) + Public Sans (body) + serif italic for pull-quotes
+- Hero: NO stock gavel photo. Use a real exterior photo of the office building,
+  or a textural shot of the desk. H1 in 14ch serif, 2 lines max.
+- Routes: `/`, `/practice-areas`, `/practice-areas/[slug]`, `/attorneys`,
+  `/insights` (3-5 plain-language explainer articles), `/contact`
+- `/practice-areas/[slug]` for each: short explainer + intake form
+- A11y note: this is high-stakes content. Plain language, no jargon, Spanish
+  toggle if the kid wants to translate
+- Pitch: *"Tio, I rewrote your firm's site in plain English (and Spanish).
+  Take a look — uncle-name-law.21mv.com. Lawyers' websites usually look fake.
+  Yours doesn't."*
+
+**5. *"My piano teacher's site looks awful — she has 30 students, no booking system."***
+- STEP 0: scrape → her name + bio, lesson formats (in-person + online),
+  rates (which she actually publishes! good), testimonials (real, with first
+  names + neighborhoods), recital photos. Old site: free WordPress template,
+  music plays on load, broken images.
+- Industry: **Tutor / coach / lessons**
+- Palette: warm cream + sage + brass (trust + warm + parent-friendly)
+- Type: serif display + sans body + italic for testimonials
+- Hero: real photo of her at the piano + 1-line pitch + "Book a trial lesson"
+- Routes: `/`, `/lessons`, `/rates`, `/about`, `/testimonials`, `/book`
+- `/book` form → `/api/leads` → email her via platform mail proxy with the
+  trial-lesson request
+- Optional: integrate a Calendly link or scheduler in `/book` page
+- Pitch: *"Ms. Chen, your students' parents would love an easier way to book
+  trial lessons. I built this version: ms-chen-piano.21mv.com. Want to use it?"*
+
+### PERSONAL PROJECTS (lower stakes, same skill)
+
+**6. *"I want a site for my soccer team, the Tigers. Show our schedule and roster."***
+- Industry: **Sports team**
 - Subdomain: `tigers-soccer.21mv.com`
 - Routes: `/`, `/schedule`, `/roster`, `/news`, `/join`
 - Palette: their jersey colors (ask: "what color are your jerseys?")
@@ -856,16 +1069,7 @@ If your tool doesn't support sub-agents, do them sequentially in this order
 - Schedule renders from a static array; roster is photo grid
 - Contact form to `/api/leads` for "Want to join the team" requests
 
-**2. *"My mom owns a bakery — site with menu, location, contact form."***
-- Industry: **Restaurant / café / bakery**
-- Subdomain: `<momsname>-bakery.21mv.com`
-- Routes: `/`, `/menu`, `/visit`, `/order`, `/about`
-- Palette: terracotta + cream + leaf-green (cozy, warm, handmade)
-- Hero: full-bleed photo of pastries + "Fresh, daily, since [year]"
-- Menu page is a long list grouped by category, prices in tabular nums
-- `/visit` has hours, address, embedded map (Leaflet + OSM, no Google Maps)
-
-**3. *"My art portfolio — drawings, paintings, comics. Black background, big images."***
+**7. *"My art portfolio — drawings, paintings, comics. Black background, big images."***
 - Industry: **Photographer / videographer** (close enough — image-led)
 - Subdomain: `<theirname>-art.21mv.com`
 - Routes: `/`, `/galleries`, `/galleries/[slug]`, `/about`, `/contact`
@@ -874,16 +1078,7 @@ If your tool doesn't support sub-agents, do them sequentially in this order
 - Hero: zero text initially, just a 16:9 of the strongest piece. Headline appears on scroll.
 - Galleries are masonry layouts; clicking opens lightbox
 
-**4. *"Site for my dad's tutoring business, math + physics, ages 14-18."***
-- Industry: **Tutor / coach / lessons**
-- Subdomain: `<dadsname>-tutoring.21mv.com`
-- Routes: `/`, `/services`, `/rates`, `/about`, `/book`
-- Palette: trust-blue + warm cream + orange accent (professional, parent-friendly)
-- Hero: "Math + physics tutoring for high schoolers · Brooklyn · since 2018"
-- `/services` lists subjects with grade levels; `/rates` has a transparent table
-- `/book` form captures parent name, student age, subjects, preferred times → `/api/leads`
-
-**5. *"Website for my D&D campaign — character pages, recap blog, session schedule."***
+**8. *"Website for my D&D campaign — character pages, recap blog, session schedule."***
 - Industry: **Fan site / hobby community** (with blog elements)
 - Subdomain: `<campaign-name>.21mv.com`
 - Routes: `/`, `/characters`, `/characters/[slug]`, `/recaps`, `/recaps/[slug]`, `/schedule`
@@ -892,25 +1087,7 @@ If your tool doesn't support sub-agents, do them sequentially in this order
 - Character pages have stat blocks, portrait, backstory
 - Recaps are markdown blog posts (use mdsvex)
 
-**6. *"My senior project: an online directory of LGBTQ-friendly therapists in the Bay Area."***
-- Industry: **Directory / lead-gen** (close to Campscout)
-- Subdomain: `bay-affirming-care.21mv.com`
-- Routes: `/`, `/specialty`, `/specialty/[slug]`, `/therapists/[slug]`, `/search`, `/about`, `/list-your-practice`
-- Palette: muted lilac + sage + cream (quiet, premium, calming)
-- Hero: editorial headline, no stock photos
-- Therapist detail pages with verified credentials + lead form
-- Sensitive topic — voice is calm, plain, anti-marketing
-
-**7. *"My band's website. We're called Static Bloom. Show tour dates, stream our songs, sell merch."***
-- Industry: **Hybrid** (events + store + about)
-- Subdomain: `staticbloom.21mv.com`
-- Routes: `/`, `/tour`, `/listen`, `/shop`, `/shop/[slug]`, `/about`
-- Palette: bold/edgy — black + neon green or magenta + grain texture
-- Type: Bowlby One display + Space Mono body
-- Hero: full-bleed band photo (B&W) + tour-dates strip below
-- Shop is barebones (Stripe link out, not an embedded checkout — that's another feature)
-
-**8. *"Charity site: we collect winter coats for kids. Just need a donate page and our mission."***
+**9. *"Charity site: we collect winter coats for kids. Just need a donate page and our mission."***
 - Industry: **Charity / nonprofit**
 - Subdomain: `coats-for-kids-<city>.21mv.com`
 - Routes: `/`, `/mission`, `/programs`, `/donate`, `/contact`
@@ -918,15 +1095,6 @@ If your tool doesn't support sub-agents, do them sequentially in this order
 - Hero: real photo of kid in coat (ask the kid for an image they have permission to use)
 - `/donate` links to their existing GoFundMe / Stripe / Bank QR
 - Plain, sincere voice. No marketing-speak.
-
-**9. *"Birthday party invite for my brother — RSVP, address, what to bring."***
-- Industry: **Event landing**
-- Subdomain: `<brothername>-bday.21mv.com`
-- Routes: `/`, `/details`, `/rsvp`
-- Palette: party-bright (whatever theme — superhero, dinosaur, princess, gaming)
-- Hero: countdown timer + "Lucas turns 8! · Saturday March 14"
-- `/details` is the practical block — address, what to bring, parking
-- `/rsvp` form → `/api/leads` (parent name + kid name + yes/no)
 
 **10. *"Resume site for me — I'm 16, want to apply for a coding internship."***
 - Industry: **Personal portfolio / résumé**
@@ -940,6 +1108,91 @@ If your tool doesn't support sub-agents, do them sequentially in this order
 For each: weave in their real names, photos, words. Never use placeholders.
 
 ---
+
+
+## Appendix B — How the kid pitches the rebuild to the business
+
+Once the new site is live at `{kid-pick}.21mv.com`, here's the pitch flow.
+This is the part that turns the skill from "fun project" into "first paying
+client at age 14."
+
+### The cold email
+
+Keep it under 100 words. Don't sound like a sales rep.
+
+```text
+Subject: I rebuilt your website — take a look (free, no obligation)
+
+Hi <Owner's first name>,
+
+I'm <Kid's name>, a <grade>th-grader from <town>. I noticed <Business>'s
+website looks like it hasn't been updated since <year>, so I rebuilt it
+this weekend as a portfolio project.
+
+Take a look: https://<sub>.21mv.com
+
+It loads in under 2 seconds, works on phones, and uses your real menu/
+services/hours/photos. Nothing is fake.
+
+If you like it, I can transfer it to your domain (<their.com>) for $<X>
+one-time, $<Y>/month for hosting + updates. If not, no worries — keep
+the URL as long as you want.
+
+— <Kid's name>
+<Kid's reply email>
+```
+
+Pricing benchmarks for first-time pitches (US, 2026 dollars):
+- One-time setup: **$300–800** (small local business)
+- Monthly hosting + minor updates: **$30–80/month** (or $300–600/year prepaid)
+- Bigger features (online ordering, booking system, e-commerce): **$200–500 each**
+
+If the business owner pushes back on price: don't budge. There's another
+business on the next street. Move on.
+
+### Walking the URL into the business in person
+
+Better conversion than email — but takes more nerve.
+
+> Walk in. *"Hi, are you the owner? My name is <Kid>. I made something for you."*
+> Show the URL on your phone, scrolling slowly. Don't talk while they look —
+> let the design speak. When they look up: *"It uses your real menu and your
+> real photos. I can give it to you for $<X>. Want to think about it?"*
+
+### What to do if the business says yes
+
+1. They send you the existing domain credentials, OR they own a Cloudflare-hosted
+   domain you can map to.
+2. Tell the kid to use the platform's "custom domain" feature (when it's built;
+   for now: SSH into the platform host, add an nginx `server_name <their.com>`
+   alias to the existing vhost, point their domain via CF DNS A record at
+   the platform IP).
+3. Switch the site's `MAIL_FROM` to use a `noreply@<their.com>` once they've
+   verified their domain on 3ava (or just keep the platform default — most
+   small businesses don't notice).
+4. Send them an invoice (Stripe Payment Links work well; Venmo/Zelle is fine
+   for friends-and-family pricing).
+
+### What to do if they say no
+
+1. Don't take it personally. Most cold pitches don't convert.
+2. The site stays at `{kid-pick}.21mv.com` as a portfolio piece. The next
+   pitch (different business, same skill) goes faster — you've got a working
+   reference URL to show.
+3. Some kids do 5-10 pitches before the first sale. That's normal.
+
+### Ethics — important
+
+- **Never claim affiliation** with the business unless they've agreed.
+  The pitch URL is `<sub>.21mv.com`, not `the-business-name.com`. Make it
+  clear it's a portfolio rebuild, not the official site.
+- **Never email the business pretending to be a "web design agency"** with
+  fake company names. Be a kid. Honesty converts better than fake authority.
+- **Never copy their photos and republish without permission.** If you
+  scraped photos from their existing site to use in the rebuild, mention it
+  in the pitch email — they own those, they can say no.
+- **Never set up a redirect or DNS hijack** of their existing domain. Wait
+  for them to come to you.
 
 ## Reference projects on the same platform
 
