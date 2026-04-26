@@ -343,6 +343,44 @@ doesn't say their phone number, ask the kid. If it doesn't list prices,
 say "Pricing — call for quote" instead of fabricating. The pitch fails the
 moment the business owner spots a fake fact.
 
+### Also research the CATEGORY (not just this one business)
+
+Before picking a palette + type, look at **3–5 other businesses in the same
+category** to calibrate aesthetic norms. A barn-window manufacturer doesn't
+look like a yacht club. A pizzeria doesn't look like a law firm. The skill's
+"vibe-to-palette" table is starting points; the category research is what
+keeps you from picking the WRONG starting point.
+
+```bash
+# Examples — pick the kind of business, search the category
+# Barn / utility windows: Andersen, Pella, Marvin, Ply Gem, Plygem
+# Auto body shop: Maaco, Caliber Collision, Service King + 2 local independent
+# Family dentistry: ADA finder + 2-3 local practices the kid sees on signs
+# Wedding photographer: WPJA winners, Borrowed & Blue feature list
+```
+
+**What you're looking for in the category** (not to copy, to understand):
+- What palette range — bright primary colors? earthy neutrals? black & gold? jewel tones?
+- What type weight — heavy serif (legal/financial), heavy slab (industrial), elegant
+  serif (premium), chunky display sans (sport/youth)?
+- What hero shape — full-bleed photo? text-led? product-led?
+- What's the trust language — certifications, years in business, awards?
+
+If your rebuild looks like the category (modernized, not copied), it'll feel
+right. If it looks like a different category, the business owner will sense
+"wrong vibe" without being able to articulate why — and the pitch dies.
+
+**Concrete failure example** (lessons from the wild):
+
+> *American Window Products LLC* (920-area Wisconsin, makes barn/basement/utility
+> windows since 1986) was rebuilt with the **"professional, calm"** palette
+> (deep navy + brushed gold + paper-bone). That palette is right for a wealth
+> advisor, wrong for a Wisconsin manufacturer of utility windows for farmers.
+> The category wants **industrial, blue-collar** — work-jacket red, blueprint
+> blue, weathered cream, heavy slab serif type. The fix: pick the row in the
+> vibe table that matches the BUSINESS NICHE, not just one adjective in the
+> kid's description.
+
 ---
 
 ## STEP 1 — The 4-minute first conversation
@@ -402,6 +440,7 @@ palette starter. **You can mix-and-match** — most real sites are hybrids.
 |---|---|---|---|
 | **Restaurant / café / bakery / pizzeria** | `/`, `/menu`, `/visit`, `/reserve`, `/order`, `/about` | warm, sensory, food-forward | terracotta + cream + leaf-green |
 | **Local contractor (HVAC, plumber, electrician, roofer, gutter, fence)** | `/`, `/services`, `/service-area`, `/about`, `/quote` | direct, no-nonsense, trustworthy | bold primary + steel-gray + safety-yellow accent |
+| **Small US manufacturer (windows, fence panels, garage doors, building products)** | `/`, `/products`, `/products/[slug]`, `/custom`, `/about`, `/quote` | American-made-pride, capable, rural-trade | fire-brick red + blueprint blue + weathered cream (the "industrial" vibe row) |
 | **Auto body / mechanic / car detailing / tire shop** | `/`, `/services`, `/before-after`, `/about`, `/quote` | tough, capable, local-pride | industrial gray + shop-orange + black |
 | **Hair salon / barbershop / nail salon / spa** | `/`, `/services`, `/team`, `/gallery`, `/book` | stylish, warm, current | brand color (often pink/sage/mauve) + cream + black |
 | **Dentist / chiropractor / PT / clinic** | `/`, `/services`, `/team`, `/insurance`, `/book` | clean, calm, trustworthy | medical-blue or sage + white + warm accent |
@@ -433,31 +472,72 @@ them you're starting from that template and they can correct.
 
 The look is half the work. Don't default to the same beige-and-blue every time.
 
-**Picking a palette (8 colors)** — derived from the kid's vibe answer:
+### 🚨 HARD CONTRAST RULE — read this BEFORE picking colors 🚨
+
+**Every palette MUST be professional and readable. NEVER place dark text on a
+dark background or light text on a light background.** This is the most common
+AI failure: deep navy primary button + near-black text on it → invisible.
+Contrast ratio 1.6:1, fails WCAG AA hard, the button looks like a black blob.
+**DO NOT DO THIS.**
+
+The fix is structural. Every palette declares **paired foreground tokens** —
+whenever you set a background color, you also explicitly set the readable
+foreground for it. Then `.btn-primary { background: var(--color-primary);
+color: var(--color-on-primary); }` — never `var(--color-ink)` blindly.
+
+**Picking a palette (10 tokens, including paired foregrounds)** — derived from
+the kid's vibe answer:
 
 ```
---color-ink            #1A1A17   /* near-black warm text */
---color-paper          #FFFFFF   /* card / elevated surface */
---color-bg             <pick>    /* primary page bg — warm or cool? */
---color-surface        <pick>    /* secondary bg, slightly different from --bg */
---color-primary        <pick>    /* the brand main color — chosen from vibe */
---color-accent         <pick>    /* hover, CTA hover, single highlights */
---color-muted          <pick>    /* text that's secondary, borders, chrome */
---color-pop            <pick>    /* rarely used; price, alerts, decorative */
+--color-ink             #1A1A17   /* near-black warm text — used on light bg */
+--color-paper           #FFFFFF   /* card / elevated surface */
+--color-bg              <pick>    /* primary page bg — warm or cool? */
+--color-surface         <pick>    /* secondary bg, slightly different from --bg */
+--color-primary         <pick>    /* the brand main color — chosen from vibe */
+--color-on-primary      <pick>    /* MUST contrast --color-primary at WCAG AA (≥4.5:1)
+                                     dark primary → set this to #FFFFFF (or --color-paper)
+                                     light primary → set this to #1A1A17 (or --color-ink) */
+--color-accent          <pick>    /* hover, CTA hover, single highlights */
+--color-on-accent       <pick>    /* MUST contrast --color-accent at WCAG AA */
+--color-muted           <pick>    /* secondary text, borders, chrome (must contrast --color-bg) */
+--color-pop             <pick>    /* rarely used; price, alerts, decorative */
 ```
 
-Vibe-to-color mappings (use these as starting points, adjust per-site):
+**Quick contrast test before you commit a palette:**
 
-| Vibe | Primary | Accent | Background |
-|---|---|---|---|
-| playful, bright | `#F5B841` (sunny gold) | `#DE5A37` (warm terracotta) | `#FAF4E8` warm cream |
-| professional, calm | `#1F3A5F` (deep navy) | `#C49A4F` (muted gold) | `#F4F2EC` paper-bone |
-| cozy, warm, handmade | `#9C5A36` (toasted clay) | `#3F5C4A` (forest) | `#F2EAD7` butter-cream |
-| bold, edgy, loud | `#0A0A0A` (near-black) | `#FF3D00` (red-orange) | `#FAFAFA` near-white |
-| quiet, premium | `#2C2A28` (charcoal) | `#A89070` (taupe-gold) | `#F8F5EE` ivory |
-| nature, earthy | `#3F5C4A` (pine) | `#B8856A` (terracotta) | `#F0EBE0` linen |
-| retro, 80s | `#FF006E` (hot pink) | `#3A86FF` (electric blue) | `#FFF5F0` light peach |
-| sport-team-specific | their primary jersey color | secondary jersey color | white or chalk |
+| If primary is | Set on-primary to |
+|---|---|
+| **dark** (navy, deep red, forest, charcoal, deep purple) — luminance L < 0.45 | `#FFFFFF` or `--color-paper` or a very light cream |
+| **medium-dark** (terracotta, mustard, olive, brick) — L 0.45–0.6 | usually `#FFFFFF`; sanity-check with a contrast tool |
+| **light** (sun-gold, butter-cream, sky-blue, pastels) — L > 0.6 | `--color-ink` (`#1A1A17`) |
+
+If you can squint at a button and not read its text, the contrast is wrong.
+WCAG AA: body text needs **4.5:1** ratio against its background; large/heading
+text needs **3:1**. Default to the paired token even when you "think" it's fine.
+
+### Vibe-to-palette mappings (with paired foregrounds)
+
+Use these as starting points, adjust per-business. Each row already has the
+foreground locked in — copy the WHOLE row.
+
+| Vibe | Primary | on-primary | Accent | on-accent | Background |
+|---|---|---|---|---|---|
+| **playful, bright** | `#F5B841` (sunny gold) | `#1A1A17` ink | `#DE5A37` (terracotta) | `#FFFFFF` | `#FAF4E8` warm cream |
+| **professional, calm** | `#1F3A5F` (deep navy) | `#FFFFFF` paper | `#C49A4F` (muted gold) | `#1A1A17` ink | `#F4F2EC` paper-bone |
+| **cozy, warm, handmade** | `#9C5A36` (toasted clay) | `#FFFFFF` paper | `#3F5C4A` (forest) | `#FFFFFF` | `#F2EAD7` butter-cream |
+| **bold, edgy, loud** | `#0A0A0A` (near-black) | `#FFFFFF` paper | `#FF3D00` (red-orange) | `#FFFFFF` | `#FAFAFA` near-white |
+| **quiet, premium** | `#2C2A28` (charcoal) | `#F8F5EE` ivory | `#A89070` (taupe-gold) | `#1A1A17` ink | `#F8F5EE` ivory |
+| **nature, earthy** | `#3F5C4A` (pine) | `#FFFFFF` paper | `#B8856A` (terracotta) | `#FFFFFF` | `#F0EBE0` linen |
+| **retro, 80s, neon** | `#FF006E` (hot pink) | `#FFFFFF` | `#3A86FF` (electric blue) | `#FFFFFF` | `#FFF5F0` light peach |
+| **industrial, blue-collar, utility, manufacturer** | `#B91C1C` (fire-brick red) | `#FFFFFF` paper | `#1E40AF` (blueprint blue) | `#FFFFFF` | `#F4EFE6` weathered cream |
+| **medical, clean, trust (dentist/clinic)** | `#0E7C7B` (sage-teal) | `#FFFFFF` paper | `#F4A53D` (warm orange) | `#1A1A17` ink | `#F4F8F7` near-white |
+| **legal, financial, premium B2B** | `#0F2A4D` (oxford blue) | `#FFFFFF` paper | `#A88A4A` (brass) | `#1A1A17` ink | `#F4F1EA` cream |
+| **sport-team-specific** | their primary jersey color | white if jersey is dark, ink if light | secondary jersey color | match-tested | white or chalk |
+
+**Choose the row that matches the BUSINESS NICHE, not just a pretty word.**
+A barn-window manufacturer in rural Wisconsin is `industrial, blue-collar`,
+NOT `professional, calm`. A small law firm IS `legal, premium B2B`. A pizzeria
+is `cozy, warm, handmade` (or `playful, bright` if it's a fun-family-vibe place).
 
 **Picking fonts (2 or 3)** — never `Inter`, `Roboto`, `Poppins`, or `Space Grotesk`.
 Use `@fontsource-variable` packages so they self-host and don't hit Google CDN.
@@ -474,6 +554,40 @@ Use `@fontsource-variable` packages so they self-host and don't hit Google CDN.
 
 When in doubt, default to **Bricolage Grotesque + Public Sans + Fraunces italic**.
 That trio is distinctive and works across most niches.
+
+### Open-source palette resources to reference
+
+If the inline vibe table doesn't fit the niche, lean on these (all MIT or
+public-domain, all designed with accessibility in mind):
+
+| Resource | URL | What it's for |
+|---|---|---|
+| **Radix UI Colors** | <https://www.radix-ui.com/colors> | **The gold standard for contrast-paired palettes.** Each named color has 12 steps; step 9 is for solid backgrounds, step 11–12 is for text on those backgrounds. Built for the exact problem this skill is fighting. MIT. |
+| **Open Color** | <https://yeun.github.io/open-color/> | Simpler 10-step scale with named tones (`red.0` … `red.9`). MIT. Good for tinkering. |
+| **Open Props** | <https://open-props.style/#colors> | Drop-in CSS custom properties. Includes shadows, easing, sizes too. MIT. |
+| **U.S. Web Design System** | <https://designsystem.digital.gov/design-tokens/color/> | Government-grade accessibility-first palette. Public domain. Boring but bulletproof. |
+| **Tailwind Colors** | <https://tailwindcss.com/docs/colors> | Already shipped in Tailwind v4. Use sparingly — too recognizable as the "Tailwind look". |
+| **Coolors** | <https://coolors.co/palettes/trending> | Visual palette browser. Free tier. Best for "what does mid-century modern actually look like in hex?" |
+| **ColorBox by Lyft** | <https://www.colorbox.io/> | Build a custom palette with controlled luminance curves. |
+| **Material 3 Theme Builder** | <https://material-foundation.github.io/material-theme-builder/> | Generates a paired-foreground palette from one source color. Apache 2.0. |
+
+**For this skill**, the most useful is **Radix Colors**. Each step's intended
+usage is explicit:
+
+```
+Step 1-2:    App background and subtle background
+Step 3-5:    Component backgrounds (hover, active states)
+Step 6-7:    Borders
+Step 8:      Solid backgrounds (hovered)
+Step 9:      Solid backgrounds (default — buttons, etc.)  ← THIS for --color-primary
+Step 10:     Solid backgrounds (hover state)
+Step 11:     Text against tinted backgrounds (low-contrast text)
+Step 12:     Text against tinted backgrounds (high-contrast text)
+```
+
+If you use Radix, set `--color-primary: blue.9` and `--color-on-primary: white`
+or the corresponding step-12 contrast color from Radix's "alpha" scale. The
+contrast pairing is built in.
 
 ---
 
@@ -594,14 +708,16 @@ declare namespace App { interface Locals {} }
 @import '@fontsource-variable/<accent>';
 
 @theme {
-  --color-ink:     #1A1A17;
-  --color-paper:   #FFFFFF;
-  --color-bg:      <pick>;
-  --color-surface: <pick>;
-  --color-primary: <pick>;
-  --color-accent:  <pick>;
-  --color-muted:   <pick>;
-  --color-pop:     <pick>;
+  --color-ink:          #1A1A17;
+  --color-paper:        #FFFFFF;
+  --color-bg:           <pick>;
+  --color-surface:      <pick>;
+  --color-primary:      <pick>;
+  --color-on-primary:   <pick>;  /* MUST contrast --color-primary at WCAG AA */
+  --color-accent:       <pick>;
+  --color-on-accent:    <pick>;  /* MUST contrast --color-accent at WCAG AA */
+  --color-muted:        <pick>;
+  --color-pop:          <pick>;
 
   --font-display: "<Display> Variable", Georgia, serif;
   --font-sans:    "<Body> Variable", ui-sans-serif, system-ui, sans-serif;
@@ -618,7 +734,7 @@ declare namespace App { interface Locals {} }
   p  { color: color-mix(in oklab, var(--color-ink) 84%, transparent); }
   a  { color: inherit; text-decoration: none; }
   a:hover { color: var(--color-accent); }
-  ::selection { background: var(--color-primary); color: var(--color-ink); }
+  ::selection { background: var(--color-primary); color: var(--color-on-primary); }
   :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -635,14 +751,16 @@ declare namespace App { interface Locals {} }
   .btn-primary {
     display: inline-flex; align-items: center; gap: 0.5rem;
     padding: 0.9rem 1.8rem;
-    background: var(--color-primary); color: var(--color-ink);
+    /* ⚠️ ALWAYS use --color-on-primary, NEVER --color-ink directly.
+       The paired token guarantees readable contrast even when primary is dark. */
+    background: var(--color-primary); color: var(--color-on-primary);
     font-weight: 600; font-size: 0.95rem;
     border-radius: 999px;
     transition: transform 180ms, box-shadow 180ms, background 180ms;
   }
   .btn-primary:hover {
     transform: translateY(-1px);
-    background: var(--color-accent);
+    background: var(--color-accent); color: var(--color-on-accent);
     box-shadow: 0 10px 28px rgba(0,0,0,0.12);
   }
   .btn-ghost {
