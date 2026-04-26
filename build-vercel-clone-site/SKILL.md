@@ -186,6 +186,45 @@ WHAT TO AVOID — the "generic AI website" failure modes
 - "We are committed to excellence" / "world-class service" / "unparalleled
   experience" / "innovative solutions" — AI marketing-speak. Say what you mean.
 
+DATED TECHNIQUES — visual treatments that say "old website"
+These were genuinely good in their era. They aren't anymore. If a kid asks
+for one of these, gently steer toward the modern alternative.
+
+- **Heavy gaussian blur on a photo background.** Peak ~2014 (Stripe-era startup
+  landing pages). Reads now as "we couldn't afford a real photo." Modern: a
+  sharp, color-graded real photo, OR a solid block of one strong brand color
+  with strong typography on top. If you genuinely need depth, use a duotone
+  treatment (single brand color + black mapped onto a real photo) — that still
+  feels current.
+- **Black-and-white background photography on service businesses.** B&W is a
+  *statement*; it works for editorial, photography portfolios, museums, luxury
+  watches, art galleries. On a window installer, a bakery, a plumber, a
+  dentist — it reads as "stock photo with a desaturate filter." Use B&W only
+  when monochrome IS the brand voice.
+- **Parallax scrolling on the hero.** 2013 trick. Distracts more than it
+  delights now, and on mobile it's a perf disaster. Skip.
+- **Full-screen video hero loops.** Hosted-on-the-page autoplaying video
+  backgrounds were the 2015–2018 default. Now they slow page load, fight the
+  text, and look generic. Use a single sharp hero photo or a static color
+  block instead. (Video CAN work as an embedded section below the fold —
+  just not as the hero background.)
+- **"Ken Burns" pan-and-zoom on hero photos.** The auto-panning landscape
+  cliche. Ages a site instantly.
+- **Glassmorphism / frosted-glass cards** stacked on busy backgrounds. Peaked
+  in 2020–2022. Read as Apple-mimicry now and the contrast is almost always
+  bad (fails AA). Skip on service sites.
+- **Big animated gradient mesh backgrounds** (the "Stripe gradient"). Was
+  cool when one site did it; now every AI default does it. Skip.
+- **Floating particle / constellation backgrounds** (the connect-the-dots
+  network animation). Crypto/SaaS landing-page tell from 2018. Always skip.
+- **Vignette + film-grain overlays on every photo.** Instagram-filter cosplay.
+  At most use a *very* subtle warm color grade (think NYT Cooking) — never
+  a heavy filter on top of every image.
+- **Big rounded-corner everything.** When EVERY card, button, image, and
+  badge has 16px+ rounded corners, the design loses any rhythm. Vary
+  rounded vs. sharp deliberately. Some layouts (industrial, editorial) want
+  square corners as the dominant choice.
+
 THE DEFAULT-DECISION RULE
 When you have to pick between two valid options and the kid hasn't specified,
 choose the option that is:
@@ -316,8 +355,39 @@ curl -sL --max-time 25 -A 'Mozilla/5.0' "https://web.archive.org/web/${TS}/<orig
 | Photography style | Lobby/storefront photos, food shots, action shots |
 | Logo file (if usable) | `<img src=…logo…>` in nav — save the URL or download |
 | Color palette of the OLD site | What 2-3 colors dominate the existing design? |
-| Social links | Footer, header, "follow us" |
+| Social links — **port these verbatim** | Footer, header, "follow us" — Facebook, Instagram, X/Twitter, LinkedIn, TikTok, YouTube, Pinterest, Yelp, Google Business |
+| Gallery / portfolio images — **download and reuse** | `/gallery`, `/portfolio`, `/work`, `/projects`, `/before-after`, `/showcase` |
 | Reviews / testimonials with real attribution | Testimonials section |
+
+### Gallery scraping (when an existing gallery is found)
+
+If the old site has any of `/gallery`, `/portfolio`, `/work`, `/our-projects`, `/before-after`, `/installations`, `/showcase`, `/photos`, scrape every image:
+
+```bash
+# Pull every <img> URL from the gallery page
+curl -sL "<existing-url>/gallery" \
+  | grep -oP '(?<=src=")[^"]+\.(jpg|jpeg|png|webp)' \
+  | sed "s|^/|<existing-url>/|" \
+  | sort -u > /tmp/gallery-urls.txt
+
+# Download each one into the new project's static folder
+mkdir -p static/images/gallery
+while read url; do
+  fn=$(basename "$url" | tr -d '?' | tr -d '#')
+  curl -sL --max-time 20 -A 'Mozilla/5.0' "$url" -o "static/images/gallery/$fn"
+done < /tmp/gallery-urls.txt
+
+# Verify (skip 0-byte / 404 placeholders)
+find static/images/gallery -type f -size +5k | head
+```
+
+If the old site is gone, hit archive.org with the same URL paths — `https://web.archive.org/web/<TS>/<old-url>/gallery` — and download the snapshotted images. Real photos of real work are the single biggest differentiator from generic stock photography.
+
+Build a `/gallery` route in the new site that displays them in a responsive masonry grid (CSS `column-count` is the simplest and works fine). Caption each image only if you can verify the caption from the old site — never make up project names or addresses.
+
+### Social-media link porting
+
+If the old site's header, footer, or contact section links to social profiles, **port those exact URLs to the new site's footer** (and a small icon row in the nav if the design supports it). Use lucide-svelte icons (`Facebook`, `Instagram`, `Twitter`, `Linkedin`, `Youtube`) — they're already in the locked stack. Open in a new tab, set `rel="noopener noreferrer"`. Don't invent social handles the business doesn't have. If the old site lists a Yelp page or a Google Business listing, those count too — port them.
 
 Write these into a research note like `/tmp/<sub>-research.md`. You'll reference
 this on every page you build.
