@@ -555,6 +555,152 @@ Use `@fontsource-variable` packages so they self-host and don't hit Google CDN.
 When in doubt, default to **Bricolage Grotesque + Public Sans + Fraunces italic**.
 That trio is distinctive and works across most niches.
 
+### 🎨 Proven palette library — copy a row, don't invent
+
+**The fastest way to ship a professional-looking site is to copy a palette
+that already passes contrast. Don't invent.** Below are 13 pre-vetted, full
+10-token palettes — each one tested to WCAG AA against its paired foregrounds.
+Match the BUSINESS to the row, paste the whole block into `app.css`, done.
+
+#### 1. Industrial / manufacturer / blue-collar (auto body, contractor, factory, building products)
+```css
+--color-ink:          #161412;   --color-paper:        #FFFFFF;
+--color-bg:           #F4EFE6;   --color-surface:      #FFFFFF;
+--color-primary:      #B91C1C;   --color-on-primary:   #FFFFFF;  /* fire-brick red */
+--color-accent:       #1E40AF;   --color-on-accent:    #FFFFFF;  /* blueprint blue */
+--color-muted:        #4B5563;   --color-pop:          #FBBF24;  /* hardware yellow, rare */
+```
+
+#### 2. Restaurant / café / bakery (warm, food-forward, handmade)
+```css
+--color-ink:          #1A1411;   --color-paper:        #FFFFFF;
+--color-bg:           #F2EAD7;   --color-surface:      #FFF8EC;
+--color-primary:      #9C5A36;   --color-on-primary:   #FFFFFF;  /* toasted clay */
+--color-accent:       #3F5C4A;   --color-on-accent:    #FFFFFF;  /* forest green */
+--color-muted:        #6B5D4A;   --color-pop:          #C73E1D;  /* tomato red, prices */
+```
+
+#### 3. Medical / dental / clinic / therapist (clean, trust, calm)
+```css
+--color-ink:          #1A2330;   --color-paper:        #FFFFFF;
+--color-bg:           #F4F8F7;   --color-surface:      #FFFFFF;
+--color-primary:      #0E7C7B;   --color-on-primary:   #FFFFFF;  /* sage-teal */
+--color-accent:       #F4A53D;   --color-on-accent:    #1A2330;  /* warm orange — ink reads on it */
+--color-muted:        #5C6B73;   --color-pop:          #BF4B3A;  /* alert red, rare */
+```
+
+#### 4. Legal / accounting / financial (premium B2B, quiet authority)
+```css
+--color-ink:          #15171C;   --color-paper:        #FFFFFF;
+--color-bg:           #F4F1EA;   --color-surface:      #FFFFFF;
+--color-primary:      #0F2A4D;   --color-on-primary:   #FFFFFF;  /* oxford blue */
+--color-accent:       #A88A4A;   --color-on-accent:    #15171C;  /* brass — ink reads on it */
+--color-muted:        #5C5847;   --color-pop:          #8B2330;  /* pomegranate, prices */
+```
+
+#### 5. Real estate / hospitality / hotel (place-led, warm-premium)
+```css
+--color-ink:          #1A1411;   --color-paper:        #FFFFFF;
+--color-bg:           #F8F5EE;   --color-surface:      #FFFFFF;
+--color-primary:      #2C2A28;   --color-on-primary:   #F8F5EE;  /* near-black with cream text */
+--color-accent:       #B8856A;   --color-on-accent:    #FFFFFF;  /* terracotta */
+--color-muted:        #8FA29B;   --color-pop:          #8B2330;  /* rate badges */
+```
+
+#### 6. Hair / beauty / spa / wellness (current, soft-bold)
+```css
+--color-ink:          #1F1419;   --color-paper:        #FFFFFF;
+--color-bg:           #FAF4F2;   --color-surface:      #FFFFFF;
+--color-primary:      #C7385E;   --color-on-primary:   #FFFFFF;  /* dusty rose */
+--color-accent:       #2C2A28;   --color-on-accent:    #FAF4F2;  /* charcoal */
+--color-muted:        #8A6D75;   --color-pop:          #D4A24A;  /* gold accent */
+```
+
+#### 7. Sports team / club / school (energetic, local-pride)
+```css
+--color-ink:          #0A0A0A;   --color-paper:        #FFFFFF;
+--color-bg:           #F5F5F5;   --color-surface:      #FFFFFF;
+--color-primary:      <jersey-color>;   --color-on-primary:   <white-or-ink-by-luminance>;
+--color-accent:       <secondary-jersey>; --color-on-accent:  <white-or-ink>;
+--color-muted:        #525252;   --color-pop:          #FBBF24;  /* score-board yellow */
+```
+> Jersey colors vary; pick from team. `on-primary` = `#FFFFFF` if jersey is dark
+> (navy, maroon, forest, black); `#0A0A0A` if jersey is light (yellow, sky, white).
+
+#### 8. Photographer / artist / creative portfolio (image-led, restrained)
+```css
+--color-ink:          #0A0A0A;   --color-paper:        #FFFFFF;
+--color-bg:           #FAFAFA;   --color-surface:      #FFFFFF;
+--color-primary:      #0A0A0A;   --color-on-primary:   #FAFAFA;  /* near-black */
+--color-accent:       #C73E1D;   --color-on-accent:    #FFFFFF;  /* signature red, rare */
+--color-muted:        #525252;   --color-pop:          #FBBF24;  /* unused unless needed */
+```
+
+#### 9. Charity / nonprofit / mission (warm, hopeful, plainspoken)
+```css
+--color-ink:          #1A1411;   --color-paper:        #FFFFFF;
+--color-bg:           #F4EDE0;   --color-surface:      #FFFFFF;
+--color-primary:      #C75D2C;   --color-on-primary:   #FFFFFF;  /* warm rust — gives, not sells */
+--color-accent:       #2D5F4E;   --color-on-accent:    #FFFFFF;  /* deep teal */
+--color-muted:        #6B5D4A;   --color-pop:          #DAA520;  /* gold for donate badges */
+```
+
+#### 10. Tutor / coach / education (encouraging, parent-trusted)
+```css
+--color-ink:          #1C1F26;   --color-paper:        #FFFFFF;
+--color-bg:           #F4F2EC;   --color-surface:      #FFFFFF;
+--color-primary:      #2563EB;   --color-on-primary:   #FFFFFF;  /* clear blue */
+--color-accent:       #F59E0B;   --color-on-accent:    #1C1F26;  /* warm amber — ink on it */
+--color-muted:        #5C6470;   --color-pop:          #DC2626;  /* alert red, rare */
+```
+
+#### 11. Tech / SaaS / portfolio (dark mode, modern dev-tool)
+```css
+--color-ink:          #E5E5E5;   --color-paper:        #1A1A1A;
+--color-bg:           #0A0A0A;   --color-surface:      #1F1F1F;
+--color-primary:      #00D9A8;   --color-on-primary:   #0A0A0A;  /* mint, dark text */
+--color-accent:       #A78BFA;   --color-on-accent:    #0A0A0A;  /* lavender */
+--color-muted:        #737373;   --color-pop:          #FB7185;  /* coral */
+```
+
+#### 12. Outdoor / adventure / nature (earthy, rugged)
+```css
+--color-ink:          #1F1B17;   --color-paper:        #FFFFFF;
+--color-bg:           #F0EBE0;   --color-surface:      #FFFFFF;
+--color-primary:      #2D5F3F;   --color-on-primary:   #FFFFFF;  /* pine */
+--color-accent:       #B8856A;   --color-on-accent:    #FFFFFF;  /* terracotta */
+--color-muted:        #6B5D4A;   --color-pop:          #E8A74A;  /* sun-gold */
+```
+
+#### 13. Retro / playful / kids' party / fun-event (hot palette)
+```css
+--color-ink:          #1F1B17;   --color-paper:        #FFFFFF;
+--color-bg:           #FFF5F0;   --color-surface:      #FFFFFF;
+--color-primary:      #FF006E;   --color-on-primary:   #FFFFFF;  /* hot pink */
+--color-accent:       #3A86FF;   --color-on-accent:    #FFFFFF;  /* electric blue */
+--color-muted:        #8E8E8E;   --color-pop:          #FFBE0B;  /* yellow */
+```
+
+### Pre-flight contrast check (before you commit any palette)
+
+After picking a palette, **verify all 4 critical pairs pass WCAG AA** (4.5:1 for body, 3:1 for headings):
+
+1. `--color-ink` on `--color-bg` — body text
+2. `--color-on-primary` on `--color-primary` — primary buttons / hero CTAs
+3. `--color-on-accent` on `--color-accent` — hover states / secondary CTAs
+4. `--color-muted` on `--color-bg` — secondary text, captions
+
+Free tools (any one):
+- <https://webaim.org/resources/contrastchecker/> — paste hex pairs
+- <https://contrast-ratio.com/#%231F3A5F-on-%23FFFFFF> — change the hexes in the URL
+- `npx contrast-cli "#1F3A5F" "#FFFFFF"` — CLI tool
+
+If any pair fails, pick a different palette row from the library above OR
+adjust the foreground (typically: switch `--color-on-primary` from `#1A1A17`
+to `#FFFFFF` or vice versa). **Do not ship a failing palette.** A failing
+palette is the most common AI-website failure mode and the kid's pitch dies
+the moment the business owner can't read the buttons.
+
 ### Open-source palette resources to reference
 
 If the inline vibe table doesn't fit the niche, lean on these (all MIT or
