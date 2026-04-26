@@ -45,6 +45,78 @@ The skill works in two modes:
 
 ---
 
+## Technology stack — LOCKED (the deployer requires exactly this)
+
+> ⚠️ **The platform's auto-generated Dockerfile assumes SvelteKit + adapter-node + npm.**
+> If you build a Next.js / Astro / Nuxt / Remix / Vite-SPA / Plain-React /
+> Hugo / Jekyll site, the build will run but the container will fail to
+> start — the runtime CMD looks for `node build` (SvelteKit's adapter-node
+> output). This skill is SvelteKit-only, on purpose. The platform expects:
+
+```
+Framework         SvelteKit 2.16+         (adapter @sveltejs/adapter-node 5.5+)
+UI runtime        Svelte 4.2.7            ← NOT Svelte 5 (lucide-svelte 0.378.0 needs 4)
+Build tool        Vite 5                  ← NOT Vite 6 (compatibility with vite-plugin-svelte 3)
+Package manager   npm                     ← NOT pnpm / yarn / bun (Dockerfile uses `npm ci`)
+Styling           Tailwind CSS v4.2.4+    (via @tailwindcss/vite plugin)
+Icons             lucide-svelte 0.378.0   ← EXACTLY this version, see "Common gotchas"
+Fonts             @fontsource-variable/*  (self-hosted, no Google Fonts CDN)
+Database driver   pg 8.13+                (per-app Postgres auto-provisioned)
+Server runtime    Node 20 (alpine)        (locked by the platform's base image)
+ID generation     nanoid 5+               (used internally by the platform too)
+TypeScript        5+ with checkJs         (the project uses .ts where it matters)
+Optional          mdsvex (markdown), embla-carousel-svelte, sveltekit-superforms
+
+Deployer expects these to be true:
+  • package.json has scripts: { dev, build, start: "node build" }
+  • svelte.config.js uses adapter() from @sveltejs/adapter-node
+  • app listens on process.env.PORT (NOT a hardcoded port)
+  • app reads process.env.DATABASE_URL for Postgres (auto-injected)
+  • optional: /api/health endpoint that returns 200 (the platform polls it)
+```
+
+**Generated Dockerfile that runs on the platform** (you don't write this, the
+deployer does — but knowing what it does helps debug):
+
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev 2>/dev/null || npm install --production 2>/dev/null || true
+COPY . .
+RUN npx svelte-kit sync || true
+RUN npm run build || true
+ENV PORT=3000              # overridden at runtime to the allocated port
+ENV HOST=0.0.0.0
+EXPOSE 3000
+CMD ["sh", "-c", "node build 2>/dev/null || node index.js 2>/dev/null || npm start"]
+```
+
+If a kid asks for a Next.js or Astro site, **politely redirect** to the SvelteKit
+template. The pattern transfers (most React/Astro components have direct Svelte
+equivalents); the platform doesn't.
+
+If a kid wants to use Bun / pnpm / yarn — same story, sequence works equally
+in any framework but the platform's `npm ci` step will fail to find a lockfile
+the right shape. Tell them "we'll use npm to deploy, you can use anything you
+like for local dev as long as the package.json runs with npm."
+
+Why these specific versions:
+- **Svelte 4 + lucide-svelte 0.378.0**: lucide 1.x is Svelte-5-only and breaks
+  SSR on Svelte 4. Pinning lucide is non-negotiable.
+- **Vite 5**: vite-plugin-svelte 3 is Svelte-4-compatible; v4 of the plugin is
+  Svelte 5+. Bumping Vite to 6 forces the plugin bump.
+- **Tailwind v4**: the `@theme` token system + zero-config setup makes the
+  one-file `app.css` pattern work. Tailwind v3 would need a separate config
+  file and `@tailwind base/components/utilities` directives.
+- **adapter-node**: deploys to a long-running Node container. adapter-static
+  doesn't fit the platform (no SSR, no per-app DB), adapter-vercel obviously
+  doesn't apply.
+- **npm**: only because the platform's Dockerfile uses `npm ci`. Switch the
+  whole platform to support pnpm/yarn/bun if you fork it.
+
+---
+
 ## The web development prompt (the creative brief)
 
 > **This is the persona the AI adopts before writing any code.** It's the

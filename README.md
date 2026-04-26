@@ -10,6 +10,8 @@ Agent skills for AI coding assistants — works with **kilocode** (free models!)
 
 Designed for **kids and beginners using kilocode with FREE models** (Qwen 2.5, DeepSeek-V2.5, Gemini Flash, local Llama 3.1). No credit card. The AI builds the site on your computer, then asks for your platform API key and deploys it for you.
 
+> **Stack is locked**: SvelteKit 2 + Svelte 4 + Tailwind v4 + lucide-svelte 0.378.0 + adapter-node + npm + Node 20. The platform's Dockerfile generator expects exactly this. Next.js / Astro / Nuxt / pnpm / bun won't work. (See [skill](./build-vercel-clone-site/SKILL.md#technology-stack--locked-the-deployer-requires-exactly-this) for why.)
+
 **Sites you can build with this**:
 
 - 🍞 Restaurants, cafés, bakeries — menu, hours, reservations
