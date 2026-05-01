@@ -1,14 +1,16 @@
 <script lang="ts">
   import {
     ArrowRight, Server, Building2, Cloud, GraduationCap,
-    Home, Briefcase, Globe, CheckCircle2
+    Home, Briefcase, Globe, CheckCircle2, Database, Mail, LayoutDashboard
   } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
-  import { useCases } from '$lib/data/products';
+  import { useCases, products, stats } from '$lib/data/products';
 
   const iconMap: Record<string, any> = {
     Server, Building2, Cloud, GraduationCap
   };
+
+  const productIcons = [Server, Database, Mail, LayoutDashboard];
 
   const teamSizes = [
     {
@@ -131,6 +133,50 @@
             See the architecture <ArrowRight size={15} class="transition-transform group-hover:translate-x-1" />
           </div>
         </a>
+      {/each}
+    </div>
+  </div>
+</section>
+
+<!-- ============================== WHAT RUNS UNDERNEATH ============================== -->
+<section class="container-page py-24">
+  <div class="max-w-3xl mb-14">
+    <span class="eyebrow mb-3 inline-block">What runs underneath</span>
+    <h2 class="mb-5">Same four products. Different mix per scenario.</h2>
+    <p class="text-lg leading-relaxed">
+      Every solution above sits on the same Proxmox stack. The only thing that
+      changes is which products you turn on and how many nodes you deploy.
+    </p>
+  </div>
+
+  <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+    {#each products as p, i}
+      <a href="/products/{p.slug}" class="card card-hover p-6 flex flex-col">
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <span class="feat-icon"><svelte:component this={productIcons[i]} size={20} /></span>
+          <span class="pill text-[10.5px]">{p.acronym}</span>
+        </div>
+        <h4 class="mb-2">{p.short}</h4>
+        <p class="text-sm leading-relaxed mb-5" style="color: var(--color-muted)">{p.tagline}</p>
+        <span class="mt-auto text-sm font-semibold underline-link" style="color: var(--color-primary)">Product page →</span>
+      </a>
+    {/each}
+  </div>
+</section>
+
+<!-- ============================== STATS STRIP ============================== -->
+<section class="py-20" style="background: var(--color-elevated)">
+  <div class="container-page">
+    <div class="max-w-3xl mb-12">
+      <span class="eyebrow mb-3 inline-block">By the numbers</span>
+      <h2 class="mb-3">A fleet of one is a starting point, not an outlier.</h2>
+    </div>
+    <div class="grid gap-x-10 gap-y-12 md:grid-cols-2 lg:grid-cols-4">
+      {#each stats as s}
+        <div>
+          <div class="stat-num">{s.num}</div>
+          <p class="mt-3 text-base" style="color: var(--color-muted); max-width: 18rem">{s.label}</p>
+        </div>
       {/each}
     </div>
   </div>
