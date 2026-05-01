@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types.js';
 
-const BASE = 'https://proxmox-modern.21mv.com';
+const BASE = 'https://proxmox1.21mv.com';
 const LASTMOD = '2026-04-01';
 
 const routes: { path: string; priority: string }[] = [

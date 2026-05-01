@@ -21,7 +21,7 @@ export const company = {
   registry: 'FN 258543 x, Commercial Court of Vienna',
   vat: 'ATU61788537',
   tagline: 'Open-source virtualization, backup, and email security — built for the data center.',
-  baseUrl: 'https://proxmox-modern.21mv.com'
+  baseUrl: 'https://proxmox1.21mv.com'
 } as const;
 
 export type Product = {
