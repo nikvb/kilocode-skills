@@ -6,6 +6,8 @@ Agent skills for AI coding assistants — works with **kilocode** (free models!)
 
 ### [`build-vercel-clone-site`](./build-vercel-clone-site/SKILL.md)
 
+> Companion: **[`DEPLOY.md`](./build-vercel-clone-site/DEPLOY.md)** — the audited API reference for the 21mv.com deploy platform. Headers, body fields, every error → cause mapping, the slim-tarball checklist, the re-deploy recipe. Open this when a deploy fails.
+
 **Rebuild any business's old, ugly website into a modern one — and pitch it to them.**
 
 Find a local business with a bad 2010-era site. Paste the URL into kilocode. The AI:

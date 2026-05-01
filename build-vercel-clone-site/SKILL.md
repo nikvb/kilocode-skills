@@ -1068,6 +1068,11 @@ Stream from `http://127.0.0.1:11434` to a Gemma 2B model. See STEP 8.
 
 ## STEP 6 — Build + tar + deploy
 
+> **Full API reference**: [`DEPLOY.md`](./DEPLOY.md) is the live, audited spec —
+> every header, every form field, every error message verified against the
+> production endpoint. The summary below is the happy path; jump to `DEPLOY.md`
+> the moment a deploy fails so you can match the exact error to its cause.
+
 ```bash
 cd ~/your-projects/<sub>
 
