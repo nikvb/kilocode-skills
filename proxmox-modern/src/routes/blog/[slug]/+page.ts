@@ -1,8 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { posts, postBySlug } from '$lib/data/posts';
-import type { PageLoad } from './$types';
 
-export const load: PageLoad = ({ params }) => {
+export const load = ({ params }: { params: { slug: string } }) => {
   const post = postBySlug(params.slug);
   if (!post) {
     throw error(404, 'Post not found');

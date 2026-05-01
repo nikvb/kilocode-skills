@@ -200,6 +200,39 @@
   </div>
 </section>
 
+<!-- AFTER INSTALL -->
+<section class="container-page py-20">
+  <div class="grid lg:grid-cols-3 gap-10">
+    <div class="lg:col-span-1">
+      <span class="eyebrow mb-3 inline-block">After install</span>
+      <h2 class="mb-5" style="font-size: clamp(1.75rem, 2vw + 1rem, 2.4rem)">
+        First five minutes.
+      </h2>
+      <p class="text-[15.5px] leading-relaxed">
+        Once the ISO is on disk, the installer asks four questions and reboots
+        into a working hypervisor. The web UI lives on
+        <code style="font-family: var(--font-mono); background: var(--color-elevated); padding: 0.1rem 0.4rem; border-radius: 4px">https://&lt;host&gt;:8006</code>.
+      </p>
+    </div>
+
+    <div class="lg:col-span-2 code-block text-[13px]">
+<span class="c-com"># 1. Switch to the no-subscription repo (or paste your enterprise key)</span>
+<span class="c-pmpt">$</span> nano /etc/apt/sources.list.d/pve-install-repo.list
+
+<span class="c-com"># 2. Update and pull the latest signed packages</span>
+<span class="c-pmpt">$</span> apt update &amp;&amp; apt full-upgrade
+
+<span class="c-com"># 3. Confirm cluster status (single node is fine)</span>
+<span class="c-pmpt">$</span> pvecm status
+<span class="c-str">Cluster information</span>
+<span class="c-str">-------------------</span>
+<span class="c-str">Name:             pve-cluster-01</span>
+<span class="c-str">Config Version:   1</span>
+<span class="c-str">Quorate:          Yes</span>
+    </div>
+  </div>
+</section>
+
 <!-- CLOSING CTA -->
 <section class="ink-section">
   <div class="container-narrow text-center py-28">

@@ -2,7 +2,7 @@
   import {
     ArrowRight, Headset, Phone, Clock, MessageSquare, BookOpen,
     Users, Github, FileCode, GraduationCap, Award, Workflow,
-    UserCheck, BadgeCheck, Mail, Terminal
+    UserCheck, BadgeCheck, Terminal
   } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
   import { tiers } from '$lib/data/pricing';

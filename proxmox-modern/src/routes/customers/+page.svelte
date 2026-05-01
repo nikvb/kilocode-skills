@@ -199,6 +199,48 @@
   </div>
 </section>
 
+<!-- DEPLOYMENT PATTERNS -->
+<section class="container-page py-20">
+  <div class="max-w-3xl mb-12">
+    <span class="eyebrow mb-3 inline-block">Deployment patterns</span>
+    <h2 class="mb-5">How customers actually use it.</h2>
+    <p class="text-lg leading-relaxed">
+      Three shapes account for nearly every paying deployment we see. The
+      hardware varies; the architecture rarely does.
+    </p>
+  </div>
+
+  <div class="grid gap-5 md:grid-cols-3">
+    <div class="card p-7">
+      <span class="pill mb-4 inline-flex">3-12 nodes</span>
+      <h4 class="mb-2">Hyperconverged starter</h4>
+      <p class="text-[14.5px] leading-relaxed">
+        Three to twelve nodes, Ceph for storage, 25 GbE for the cluster
+        network, internal workloads on top. The stock answer for SMEs and
+        public-sector teams replacing aging VMware estates.
+      </p>
+    </div>
+    <div class="card p-7">
+      <span class="pill mb-4 inline-flex">20-60 nodes</span>
+      <h4 class="mb-2">Production data center</h4>
+      <p class="text-[14.5px] leading-relaxed">
+        Multi-rack, multi-cluster, with PBS as the shared backup target and
+        PMG in front of the corporate mail. SDN VXLAN/EVPN bridges sites.
+        Premium support is the norm here.
+      </p>
+    </div>
+    <div class="card p-7">
+      <span class="pill mb-4 inline-flex">100+ nodes</span>
+      <h4 class="mb-2">Service provider</h4>
+      <p class="text-[14.5px] leading-relaxed">
+        Multi-tenant pools, REST-driven provisioning, billing-friendly token
+        auth, Datacenter Manager for the operations console. Hetzner,
+        OVHcloud, and dozens of regional providers run shapes like this.
+      </p>
+    </div>
+  </div>
+</section>
+
 <!-- CLOSING CTA -->
 <section class="ink-section">
   <div class="container-narrow text-center py-28">

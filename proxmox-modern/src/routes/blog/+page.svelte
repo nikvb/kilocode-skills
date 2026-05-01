@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowRight, Calendar, Clock, User, Mail } from 'lucide-svelte';
+  import { ArrowRight, Calendar, User, Mail } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
   import { posts, categories } from '$lib/data/posts';
 
