@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
-    ArrowRight, Check, Star, Cpu, MessageCircleQuestion,
-    Phone, Users, BadgeCheck, ShieldCheck, Headset
+    ArrowRight, Check, Star, MessageCircleQuestion, BadgeCheck
   } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
   import { tiers, fxNote } from '$lib/data/pricing';

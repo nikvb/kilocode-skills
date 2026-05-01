@@ -1,7 +1,7 @@
 <script lang="ts">
   import {
     ArrowRight, MapPin, Phone, Mail, Calendar, Building2,
-    GitBranch, BadgeCheck, Heart, Users
+    GitBranch, Heart
   } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
   import { company, stats } from '$lib/data/products';
