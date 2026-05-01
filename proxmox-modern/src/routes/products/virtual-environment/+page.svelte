@@ -2,7 +2,7 @@
   import {
     ArrowRight, Server, Database, Mail, LayoutDashboard,
     Cpu, Network, ShieldCheck, Layers, Workflow, GitBranch,
-    Boxes, Lock, Zap, CheckCircle2, Tape, Repeat,
+    Boxes, Lock, Zap, CheckCircle2, Archive, Repeat,
     Activity, Users, Terminal, Bug, Inbox
   } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
@@ -12,7 +12,7 @@
 
   const iconMap: Record<string, any> = {
     Server, Database, Mail, LayoutDashboard, Cpu, Network, ShieldCheck,
-    Layers, Workflow, GitBranch, Boxes, Lock, Zap, CheckCircle2, Tape, Repeat,
+    Layers, Workflow, GitBranch, Boxes, Lock, Zap, CheckCircle2, Archive, Repeat,
     Activity, Users, Terminal, Bug, Inbox
   };
 </script>

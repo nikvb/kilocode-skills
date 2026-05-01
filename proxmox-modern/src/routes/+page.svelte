@@ -3,7 +3,7 @@
     ArrowRight, Server, Database, Mail, LayoutDashboard,
     Cpu, Network, ShieldCheck, Layers, Workflow, GitBranch,
     Building2, Cloud, GraduationCap, Boxes, Lock, Zap, CheckCircle2,
-    Tape, Repeat, BadgeCheck, MessageSquare, Quote, Star
+    Archive, Repeat, BadgeCheck, Quote
   } from 'lucide-svelte';
   import Seo from '$lib/components/Seo.svelte';
   import { products, stats, useCases, customers, testimonials, company } from '$lib/data/products';
@@ -11,7 +11,7 @@
   const iconMap: Record<string, any> = {
     Server, Database, Mail, LayoutDashboard, Cpu, Network, ShieldCheck,
     Layers, Workflow, GitBranch, Building2, Cloud, GraduationCap,
-    Boxes, Lock, Zap, CheckCircle2, Tape, Repeat
+    Boxes, Lock, Zap, CheckCircle2, Archive, Repeat
   };
 
   const jsonLd = {

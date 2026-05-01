@@ -224,7 +224,7 @@ export const products: Product[] = [
           'Every backup is hashed (SHA-256). Background verify jobs detect bit rot before you need the backup, not after.'
       },
       {
-        icon: 'Tape',
+        icon: 'Archive',
         title: 'Tape support included',
         body:
           'Tier-2 retention to LTO-5 through LTO-9 drives and libraries. Native tape jobs, restore-from-tape, and changer support — no third-party agent needed.'
