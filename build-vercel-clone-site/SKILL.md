@@ -355,7 +355,7 @@ curl -sL --max-time 25 -A 'Mozilla/5.0' "https://web.archive.org/web/${TS}/<orig
 | Photography style | Lobby/storefront photos, food shots, action shots |
 | Logo file (if usable) | `<img src=…logo…>` in nav — save the URL or download |
 | Color palette of the OLD site | What 2-3 colors dominate the existing design? |
-| Social links — **port these verbatim** | Footer, header, "follow us" — Facebook, Instagram, X/Twitter, LinkedIn, TikTok, YouTube, Pinterest, Yelp, Google Business |
+| Social links — **port ALL of these verbatim** | Footer, header, "follow us", floating widgets, sidebar, About page, team bios — Facebook, Instagram, X/Twitter, LinkedIn, TikTok, YouTube, Pinterest, Yelp, Google Business, WhatsApp, Telegram, Snapchat, Reddit, Twitch, Discord, Threads, Bluesky, Mastodon, Vimeo, SoundCloud, Spotify, Apple Music, Bandcamp, Tumblr, Flickr, Medium, Substack, GitHub, GitLab, Dribbble, Behance, Glassdoor, Angi, HomeAdvisor, Houzz, Nextdoor, Alignable |
 | Gallery / portfolio images — **download and reuse** | `/gallery`, `/portfolio`, `/work`, `/projects`, `/before-after`, `/showcase` |
 | Reviews / testimonials with real attribution | Testimonials section |
 
@@ -387,7 +387,33 @@ Build a `/gallery` route in the new site that displays them in a responsive maso
 
 ### Social-media link porting
 
-If the old site's header, footer, or contact section links to social profiles, **port those exact URLs to the new site's footer** (and a small icon row in the nav if the design supports it). Use lucide-svelte icons (`Facebook`, `Instagram`, `Twitter`, `Linkedin`, `Youtube`) — they're already in the locked stack. Open in a new tab, set `rel="noopener noreferrer"`. Don't invent social handles the business doesn't have. If the old site lists a Yelp page or a Google Business listing, those count too — port them.
+If the old site links to social profiles anywhere — header, footer, contact section, floating widgets, sidebar, About page, team bios, blog author boxes — **extract and port EVERY ONE of those exact URLs to the new site**. Don't cherry-pick "the big ones"; if they have a Bandcamp, a Nextdoor, and a Glassdoor, port all three.
+
+**Where to look on the old site:**
+- Header / nav bar (small icon row)
+- Footer (icon grids, "Follow us", "Connect", "Community")
+- Contact page ("Find us online", "Follow our work")
+- About page (team personal profiles, founder bios)
+- Blog / news posts (author bio boxes with social links)
+- Floating sidebar widgets ("Share this", "Follow us")
+- Sticky bottom bars or chat widgets that link out
+- Any page with an embed or badge (e.g., Yelp badge, Google review button, TripAdvisor widget)
+
+**Platforms to capture (check for ALL of these):**
+- **Social feeds:** Facebook, Instagram, X/Twitter, LinkedIn, TikTok, YouTube, Pinterest, Tumblr, Flickr, Snapchat, Reddit, Twitch
+- **Messaging / chat:** WhatsApp, Telegram, Signal, Discord, Facebook Messenger
+- **Professional / reviews:** Yelp, Google Business, Glassdoor, Angi, HomeAdvisor, Houzz, Nextdoor, Alignable, Thumbtack, BBB
+- **Creator / portfolio:** Threads, Bluesky, Mastodon, Vimeo, SoundCloud, Spotify, Apple Music, Bandcamp, Medium, Substack, GitHub, GitLab, Dribbble, Behance
+- **Industry-specific:** Houzz (home improvement), Goodreads (authors), Strava (fitness), AllTrails (outdoors), etc.
+
+**In the new site's footer (and nav if the design supports it):**
+- Use lucide-svelte icons for the common platforms (`Facebook`, `Instagram`, `Twitter`, `Linkedin`, `Youtube`) — already in the locked stack.
+- For platforms lucide-svelte does NOT have an icon for, use the generic `ExternalLink` icon or a small text label (e.g., "Yelp", "Nextdoor", "Bandcamp") beside the link. Never skip a link just because there's no matching icon.
+- Open every social link in a new tab with `rel="noopener noreferrer"`.
+- Group links logically if there are many (e.g., "Social" row, "Reviews" row, "Professional" row), or keep them in one clean row if ≤6.
+- Don't invent handles the business doesn't have. If the old site lists a Yelp page or a Google Business listing, those count too — port them.
+
+Write these into a research note like `/tmp/<sub>-research.md`. You'll reference this on every page you build.
 
 Write these into a research note like `/tmp/<sub>-research.md`. You'll reference
 this on every page you build.
@@ -1029,6 +1055,10 @@ color, links to the routes you decided in STEP 2.
 ### 5d. `src/lib/components/Footer.svelte`
 4 columns: brand + tagline; whatever 3-column groupings fit (For visitors /
 For [their audience] / Connect). Real contact info from their answers.
+Include **ALL social links found during research** — not just a subset. If there
+are many, group them by type (Social / Reviews / Professional / Messaging) or
+use a compact icon row. Never drop a link just because there's no matching
+lucide-svelte icon; use `ExternalLink` or a text label instead.
 
 ### 5e. `src/routes/+page.svelte` — the home page (THE most important file)
 6–8 sections. The exact set depends on industry but always include:
