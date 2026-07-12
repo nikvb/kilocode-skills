@@ -6,6 +6,10 @@ All data is stored in the browser's `localStorage`.
 
 ## What it does
 
+- **Scan a meal photo (AI)** — photograph a plate and a Claude vision model
+  identifies the foods and estimates their nutrition. You review and correct the
+  estimates before they're logged. See **AI meal scanning** below for setup and
+  limits.
 - **Daily totals against your targets** — calories as a budget, plus macro bars
   for protein, net carbs (total carbs − fiber), fiber, and fat. Goals turn green
   when reached; budgets turn red when exceeded.
@@ -22,12 +26,34 @@ All data is stored in the browser's `localStorage`.
   and B12 to your own plan.
 - **Light & dark themes**, responsive down to phone width.
 
+## AI meal scanning
+
+Open **AI meal scanning** in the app, paste your own
+[Anthropic API key](https://console.anthropic.com/settings/keys), and pick a
+model (Opus 4.8 is most accurate; Sonnet 5 / Haiku 4.5 are faster and cheaper).
+Then tap **Scan a meal photo**, choose or take a picture, and review the detected
+items before adding them to the log.
+
+Two real limits:
+
+- **It only works when you open `index.html` locally** (or self-host it).
+  Scanning makes a direct browser call to `api.anthropic.com`, which the
+  claude.ai artifact page blocks — you'll see a clear message there. The app
+  downscales images before sending to keep requests small.
+- **The key is stored in your browser** (`localStorage`) and is visible to the
+  page, so use a key you're comfortable keeping on your own machine. Requests go
+  only to Anthropic; nothing else leaves your browser.
+
+Every estimate is the model's best guess — the review step lets you fix portions,
+and you can still edit any logged item afterward.
+
 ## Notes
 
 - Nutrition values are typical references for the listed serving sizes. Edit any
   food to match the exact numbers on your labels.
-- There's no external food-database API — the food list is what's preloaded plus
-  what you add. That's a deliberate trade for working fully offline.
+- Besides AI scanning, there's no external food-database lookup — the manual food
+  list is what's preloaded plus what you add. That's a deliberate trade for
+  working fully offline.
 - Not medical advice.
 
 ## Data & privacy

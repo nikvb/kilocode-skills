@@ -222,7 +222,68 @@
   footer.foot{margin-top:36px; text-align:center; color:var(--faint); font-size:12px; line-height:1.6}
   footer.foot b{color:var(--muted); font-weight:600}
 
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  /* ---------- meal scan ---------- */
+  .scan-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:9px;
+    background:var(--accent); color:#fff; border:none; border-radius:11px;
+    padding:12px 14px; font-size:14.5px; font-weight:600; margin:2px 0 12px;
+  }
+  :root[data-theme="dark"] .scan-btn{color:#0c130e}
+  @media (prefers-color-scheme:dark){.scan-btn{color:#0c130e}}
+  .scan-btn:hover{background:var(--accent-ink)}
+  .scan-btn:disabled{opacity:.6; cursor:progress}
+  .scan-btn svg{width:18px; height:18px}
+  .or{display:flex; align-items:center; gap:10px; color:var(--faint); font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px}
+  .or::before,.or::after{content:""; flex:1; height:1px; background:var(--line)}
+  .scan-msg{font-size:12.5px; border-radius:9px; padding:9px 11px; margin:0 0 10px; display:none; line-height:1.45}
+  .scan-msg.err{display:block; background:var(--over-soft); color:var(--over)}
+  .scan-msg.info{display:block; background:var(--accent-soft); color:var(--accent-ink)}
+
+  /* modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(20,26,20,.55); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; padding:18px; z-index:50;
+  }
+  .overlay.open{display:flex}
+  .modal{
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.5); width:100%; max-width:520px;
+    max-height:88vh; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .modal-h{display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:18px 20px 8px}
+  .modal-h h2{font-size:18px}
+  .modal-h .x{background:none; border:none; color:var(--muted); font-size:22px; line-height:1; padding:2px 6px; border-radius:8px}
+  .modal-h .x:hover{color:var(--ink); background:var(--surface-2)}
+  .modal-sub{padding:0 20px; font-size:12.5px; color:var(--muted); line-height:1.45}
+  .modal-body{overflow-y:auto; padding:12px 20px 4px; flex:1}
+  .scan-item{display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--line)}
+  .scan-item:first-child{border-top:none}
+  .scan-item.dropped{opacity:.4}
+  .scan-item .si-food{flex:1; min-width:0}
+  .scan-item .si-food .fn{font-size:14.5px; font-weight:500}
+  .scan-item .si-food .fs{font-size:12px; color:var(--muted); font-family:var(--font-num)}
+  .scan-item input.si-qty{width:66px; text-align:right}
+  .scan-item .si-cal{font-family:var(--font-num); font-size:13.5px; font-weight:600; min-width:52px; text-align:right}
+  .scan-item .si-del{background:none; border:none; color:var(--faint); font-size:17px; padding:2px 5px; border-radius:7px}
+  .scan-item .si-del:hover{color:var(--over); background:var(--over-soft)}
+  .modal-foot{display:flex; align-items:center; gap:10px; padding:14px 20px 18px; border-top:1px solid var(--line)}
+  .modal-foot .spacer{flex:1}
+  .modal-note{padding:2px 20px 12px; font-size:11.5px; color:var(--faint); line-height:1.4}
+  .spinner{width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* settings fields */
+  .field{margin-bottom:14px}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.06em}
+  .field input,.field select{width:100%}
+  .field .row{display:flex; gap:8px}
+  .field .row input{flex:1}
+  .field .reveal{background:var(--surface-2); border:1px solid var(--line-strong); border-radius:10px; color:var(--muted); padding:0 12px; font-size:12.5px}
+  .field .reveal:hover{color:var(--ink)}
+
+  .log li .scanned::after{content:"scanned"; font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--accent-ink); background:var(--accent-soft); border-radius:999px; padding:1px 6px; margin-left:7px; vertical-align:middle}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
 </style>
 </head>
 <body>
@@ -276,6 +337,13 @@
           <span class="hint" id="logCount">0 items</span>
         </div>
         <div class="card-body">
+          <button class="scan-btn" id="scanBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2"/></svg>
+            <span id="scanBtnLabel">Scan a meal photo</span>
+          </button>
+          <input type="file" id="scanInput" accept="image/*" capture="environment" hidden>
+          <div class="scan-msg" id="scanMsg"></div>
+          <div class="or">or add manually</div>
           <div class="add">
             <select id="foodSelect" aria-label="Choose a food"></select>
             <input class="qty num" id="qtyInput" type="number" min="0" step="0.25" value="1" aria-label="Servings">
@@ -357,6 +425,56 @@
       <p class="qhint" style="padding-top:14px">Net carbs are counted as total carbohydrate minus fiber. Calories, net carbs and fat read as budgets (green while under, red when over); protein, fiber, iron and B12 read as goals to reach.</p>
     </div>
   </details>
+
+  <!-- AI SCANNING -->
+  <details class="panel" id="aiPanel">
+    <summary>AI meal scanning <span class="cnt">connect a vision model</span><span class="chev">›</span></summary>
+    <div class="panel-body">
+      <p class="qhint" style="padding:14px 0 4px; line-height:1.5">
+        Photograph a meal and a Claude vision model identifies the foods and estimates their nutrition automatically.
+        It needs your own <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic API key</a>, stored only in this browser.
+        Every estimate is a guess you can correct before it's logged.
+      </p>
+      <div class="field">
+        <label for="apiKey">Anthropic API key</label>
+        <div class="row">
+          <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+          <button class="reveal" id="revealKey" type="button">Show</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="modelSelect">Model</label>
+        <select id="modelSelect">
+          <option value="claude-opus-4-8">Claude Opus 4.8 — most accurate</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 — faster, cheaper</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest</option>
+        </select>
+      </div>
+      <p class="qhint" style="line-height:1.5">
+        <b>Two limits to know.</b> Scanning makes a direct browser call to Anthropic, so it only works when you open
+        this file locally — it will fail on the shared claude.ai link (that page blocks external calls). And a browser-stored
+        key is visible to this page, so use a key you're comfortable keeping on your own machine. Not medical advice.
+      </p>
+    </div>
+  </details>
+
+  <!-- SCAN REVIEW MODAL -->
+  <div class="overlay" id="scanOverlay" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+    <div class="modal">
+      <div class="modal-h">
+        <h2 id="scanTitle">Review the scan</h2>
+        <button class="x" id="scanClose" type="button" aria-label="Close">×</button>
+      </div>
+      <p class="modal-sub" id="scanNotes"></p>
+      <div class="modal-body" id="scanItems"></div>
+      <p class="modal-note">Adjust servings or remove anything that's wrong. These estimates are approximate — edit after logging if you know the real numbers.</p>
+      <div class="modal-foot">
+        <button class="btn-ghost" id="scanCancel" type="button">Cancel</button>
+        <span class="spacer"></span>
+        <button class="btn-primary" id="scanConfirm" type="button">Add to log</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="foot">
     <p><b>Daily Plate</b> — everything is saved in this browser only. No account, no cloud.<br>
@@ -460,10 +578,12 @@
 
   // ---- totals ----
   function dayEntries(){ return state.log[viewDate] || []; }
+  // an entry is either {foodId, qty} referencing the library, or {food:{...}, qty} for a scanned/inline food
+  function entryFood(e){ return e.foodId ? foodById(e.foodId) : e.food; }
   function computeTotals(){
     const t = {cal:0,protein:0,carbs:0,fiber:0,fat:0,iron:0,b12:0};
     dayEntries().forEach(e=>{
-      const f = foodById(e.foodId); if(!f) return;
+      const f = entryFood(e); if(!f) return;
       const q = e.qty;
       t.cal+=f.cal*q; t.protein+=f.protein*q; t.carbs+=f.carbs*q;
       t.fiber+=f.fiber*q; t.fat+=f.fat*q; t.iron+=(f.iron||0)*q; t.b12+=(f.b12||0)*q;
@@ -607,12 +727,12 @@
       return;
     }
     list.innerHTML = entries.map((e,i)=>{
-      const f = foodById(e.foodId);
+      const f = entryFood(e);
       if(!f) return "";
       const q=e.qty;
       const net = Math.max(0,(f.carbs-f.fiber)*q);
       return `<li>
-        <div class="food"><div class="fn">${escapeHtml(f.name)}</div>
+        <div class="food"><div class="fn ${e.scanned?'scanned':''}">${escapeHtml(f.name)}</div>
           <div class="fs">${fmtQty(q)} × ${escapeHtml(f.serving)}</div></div>
         <div class="macros">
           <span>P <b>${fmt(f.protein*q, f.protein*q<10?1:0)}</b></span>
@@ -715,6 +835,190 @@
 
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
+  // ---- AI meal scanning ----
+  const KEY_LS = LS_KEY+".apiKey", MODEL_LS = LS_KEY+".model";
+  let scanResults = [];
+
+  function getApiKey(){ try{ return localStorage.getItem(KEY_LS) || ""; }catch(e){ return ""; } }
+  function getModel(){ try{ return localStorage.getItem(MODEL_LS) || "claude-opus-4-8"; }catch(e){ return "claude-opus-4-8"; } }
+
+  function scanMsg(text, kind){
+    const m = el("scanMsg");
+    m.className = "scan-msg" + (text ? " "+kind : "");
+    m.textContent = text || "";
+  }
+  function setScanning(on){
+    const b = el("scanBtn");
+    b.disabled = on;
+    el("scanBtnLabel").textContent = on ? "Reading photo…" : "Scan a meal photo";
+    el("scanBtn").querySelector("svg").style.display = on ? "none" : "";
+    let sp = b.querySelector(".spinner");
+    if(on && !sp){ sp = document.createElement("span"); sp.className="spinner"; b.insertBefore(sp, b.firstChild); }
+    if(!on && sp) sp.remove();
+  }
+
+  // downscale to keep the request small and cheap; returns {media_type, data}
+  function fileToImage(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onerror = ()=>reject(new Error("Could not read that file."));
+      reader.onload = ()=>{
+        const img = new Image();
+        img.onerror = ()=>reject(new Error("That file isn't a readable image."));
+        img.onload = ()=>{
+          const max = 1200;
+          let {width:w, height:h} = img;
+          if(w>max || h>max){ const s = max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+          const c = document.createElement("canvas");
+          c.width=w; c.height=h;
+          c.getContext("2d").drawImage(img,0,0,w,h);
+          const url = c.toDataURL("image/jpeg", 0.85);
+          resolve({ media_type:"image/jpeg", data:url.split(",")[1] });
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const SCAN_SCHEMA = {
+    type:"object",
+    properties:{
+      items:{ type:"array", items:{
+        type:"object",
+        properties:{
+          name:{type:"string"}, serving:{type:"string"}, quantity:{type:"number"},
+          calories:{type:"number"}, protein_g:{type:"number"}, carbs_g:{type:"number"},
+          fiber_g:{type:"number"}, fat_g:{type:"number"}, iron_mg:{type:"number"}, b12_ug:{type:"number"}
+        },
+        required:["name","serving","quantity","calories","protein_g","carbs_g","fiber_g","fat_g","iron_mg","b12_ug"],
+        additionalProperties:false
+      }},
+      notes:{type:"string"}
+    },
+    required:["items","notes"],
+    additionalProperties:false
+  };
+  const SCAN_PROMPT = "You are a nutrition estimator. Identify each distinct food or drink in this photo. "+
+    "For each item, describe the portion shown as a short household measure plus grams (e.g. \"1 cup (about 165 g)\"), "+
+    "and estimate its nutrition FOR THE WHOLE PORTION SHOWN, not per 100 g: calories, protein (g), total carbohydrate (g), "+
+    "fiber (g), fat (g), iron (mg) and vitamin B12 (micrograms). Set quantity to 1 for each item since the numbers already "+
+    "cover the full portion. If unsure, give your best estimate rather than zero. In 'notes', add one short sentence about "+
+    "your overall confidence or anything ambiguous.";
+
+  async function runScan(file){
+    const key = getApiKey();
+    if(!key){
+      el("aiPanel").open = true;
+      el("aiPanel").scrollIntoView({behavior:"smooth", block:"center"});
+      scanMsg("Add your Anthropic API key below to enable scanning.", "info");
+      el("apiKey").focus();
+      return;
+    }
+    scanMsg("", "");
+    setScanning(true);
+    try{
+      const image = await fileToImage(file);
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{
+          "content-type":"application/json",
+          "x-api-key":key,
+          "anthropic-version":"2023-06-01",
+          "anthropic-dangerous-direct-browser-access":"true"
+        },
+        body: JSON.stringify({
+          model: getModel(),
+          max_tokens: 1500,
+          output_config:{ format:{ type:"json_schema", schema:SCAN_SCHEMA } },
+          messages:[{ role:"user", content:[
+            { type:"image", source:{ type:"base64", media_type:image.media_type, data:image.data } },
+            { type:"text", text:SCAN_PROMPT }
+          ]}]
+        })
+      });
+      if(!res.ok){
+        let detail = "";
+        try{ const j = await res.json(); detail = j.error && j.error.message ? j.error.message : ""; }catch(e){}
+        if(res.status===401) throw new Error("That API key was rejected (401). Check it in the AI meal scanning settings.");
+        if(res.status===429) throw new Error("Rate limited (429). Wait a moment and try again.");
+        throw new Error("The model request failed ("+res.status+")"+(detail?": "+detail:"")+".");
+      }
+      const data = await res.json();
+      if(data.stop_reason==="refusal") throw new Error("The model declined to analyze that image. Try a clearer food photo.");
+      const textBlock = (data.content||[]).find(b=>b.type==="text");
+      if(!textBlock) throw new Error("The model returned no readable result. Try again.");
+      let parsed;
+      try{ parsed = JSON.parse(textBlock.text); }catch(e){ throw new Error("Could not read the model's response. Try again."); }
+      const items = (parsed.items||[]).filter(it=>it && it.name);
+      if(!items.length){ scanMsg("No food was detected in that photo. Try another shot.", "info"); return; }
+      openScanReview(items, parsed.notes||"");
+    }catch(err){
+      // A TypeError from fetch almost always means the network call was blocked.
+      const blocked = (err instanceof TypeError) || /Failed to fetch|NetworkError|load failed/i.test(err.message||"");
+      scanMsg(blocked
+        ? "The scan request was blocked. This feature can't run on the shared claude.ai link — open this file locally (or self-host it) and try again."
+        : (err.message || "Something went wrong. Try again."), "err");
+    }finally{
+      setScanning(false);
+    }
+  }
+
+  function openScanReview(items, notes){
+    scanResults = items.map(it=>({
+      food:{
+        name: it.name,
+        serving: it.serving || "1 serving",
+        cal: num(it.calories), protein: num(it.protein_g), carbs: num(it.carbs_g),
+        fiber: num(it.fiber_g), fat: num(it.fat_g), iron: num(it.iron_mg), b12: num(it.b12_ug)
+      },
+      qty: it.quantity>0 ? round(it.quantity,2) : 1,
+      dropped:false
+    }));
+    el("scanNotes").textContent = notes || "";
+    el("scanNotes").style.display = notes ? "block" : "none";
+    renderScanItems();
+    el("scanOverlay").classList.add("open");
+  }
+  function num(v){ const n = parseFloat(v); return isFinite(n)&&n>=0 ? n : 0; }
+
+  function renderScanItems(){
+    const box = el("scanItems");
+    box.innerHTML = scanResults.map((r,i)=>{
+      const f=r.food, q=r.qty;
+      return `<div class="scan-item ${r.dropped?'dropped':''}">
+        <div class="si-food"><div class="fn">${escapeHtml(f.name)}</div>
+          <div class="fs">${escapeHtml(f.serving)} · P ${fmt(f.protein,f.protein<10?1:0)} · C ${fmt(f.carbs,f.carbs<10?1:0)} · F ${fmt(f.fat,f.fat<10?1:0)}</div></div>
+        <input class="si-qty num" type="number" min="0" step="0.25" value="${fmtQty(q)}" data-i="${i}" ${r.dropped?'disabled':''} aria-label="Servings of ${escapeHtml(f.name)}">
+        <div class="si-cal">${fmt(f.cal*q)}<small style="color:var(--muted); font-weight:400"> cal</small></div>
+        <button class="si-del" data-i="${i}" type="button" aria-label="${r.dropped?'Restore':'Remove'} ${escapeHtml(f.name)}">${r.dropped?'↺':'×'}</button>
+      </div>`;
+    }).join("");
+    box.querySelectorAll(".si-qty").forEach(inp=>{
+      inp.addEventListener("input",()=>{
+        const i=+inp.dataset.i, v=parseFloat(inp.value);
+        scanResults[i].qty = isFinite(v)&&v>0 ? round(v,2) : 0;
+        renderScanItems();
+      });
+    });
+    box.querySelectorAll(".si-del").forEach(b=>{
+      b.addEventListener("click",()=>{ const i=+b.dataset.i; scanResults[i].dropped=!scanResults[i].dropped; renderScanItems(); });
+    });
+    const keep = scanResults.filter(r=>!r.dropped).length;
+    el("scanConfirm").textContent = keep ? "Add "+keep+(keep===1?" item":" items")+" to log" : "Add to log";
+    el("scanConfirm").disabled = !keep;
+  }
+  function closeScanReview(){ el("scanOverlay").classList.remove("open"); scanResults=[]; }
+  function confirmScanReview(){
+    const keep = scanResults.filter(r=>!r.dropped && r.qty>0);
+    if(!keep.length){ closeScanReview(); return; }
+    if(!state.log[viewDate]) state.log[viewDate]=[];
+    keep.forEach(r=>state.log[viewDate].push({ food:r.food, qty:r.qty, scanned:true }));
+    save(); closeScanReview();
+    renderSummary(); renderLog();
+    scanMsg("Added "+keep.length+(keep.length===1?" item":" items")+" from your photo.", "info");
+  }
+
   // ---- theme ----
   function currentTheme(){
     const attr = document.documentElement.getAttribute("data-theme");
@@ -752,6 +1056,39 @@
   });
   el("cancelNewFood").addEventListener("click",()=>{ el("newFoodForm").style.display="none"; });
   el("saveNewFood").addEventListener("click",saveNewFood);
+
+  // scanning + settings
+  el("scanBtn").addEventListener("click",()=>{
+    if(!getApiKey()){ runScan(null); return; }  // routes to the "add your key" prompt
+    el("scanInput").click();
+  });
+  el("scanInput").addEventListener("change",e=>{
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";               // allow re-picking the same file
+    if(file) runScan(file);
+  });
+  el("apiKey").addEventListener("change",e=>{
+    const v = e.target.value.trim();
+    try{ v ? localStorage.setItem(KEY_LS, v) : localStorage.removeItem(KEY_LS); }catch(err){}
+    if(v) scanMsg("", "");
+  });
+  el("revealKey").addEventListener("click",()=>{
+    const inp = el("apiKey"), showing = inp.type==="text";
+    inp.type = showing ? "password" : "text";
+    el("revealKey").textContent = showing ? "Show" : "Hide";
+  });
+  el("modelSelect").addEventListener("change",e=>{
+    try{ localStorage.setItem(MODEL_LS, e.target.value); }catch(err){}
+  });
+  el("scanClose").addEventListener("click",closeScanReview);
+  el("scanCancel").addEventListener("click",closeScanReview);
+  el("scanConfirm").addEventListener("click",confirmScanReview);
+  el("scanOverlay").addEventListener("click",e=>{ if(e.target===el("scanOverlay")) closeScanReview(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && el("scanOverlay").classList.contains("open")) closeScanReview(); });
+  (function initScanSettings(){
+    el("apiKey").value = getApiKey();
+    el("modelSelect").value = getModel();
+  })();
 
   renderAll();
 })();
