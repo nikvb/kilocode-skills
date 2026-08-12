@@ -528,6 +528,59 @@
 
   document.getElementById("g-next").addEventListener("click", nextStop);
 
+  // ---- Live data from OpenStreetMap (Overpass) ----
+  // In production the browser has internet, so pull real Shibuya store data and
+  // merge it on top of the curated seed. Fails silently offline / when blocked.
+  function osmCategory(t) {
+    const s = t.shop, a = t.amenity, u = t.tourism;
+    if (u === "viewpoint") return "viewpoint";
+    if (["attraction", "gallery", "museum", "artwork"].includes(u)) return "landmark";
+    if (["cafe", "restaurant", "fast_food", "bar", "pub"].includes(a)) return "food";
+    if (["department_store", "mall"].includes(s)) return "department";
+    if (["clothes", "boutique", "shoes", "bag", "jewelry", "fashion_accessories"].includes(s)) return "fashion";
+    if (["electronics", "mobile_phone", "computer", "camera", "hifi"].includes(s)) return "electronics";
+    if (["music", "musical_instrument"].includes(s)) return "music";
+    if (["books", "anime", "games", "video_games", "toys", "collector", "comic"].includes(s)) return "otaku";
+    return "variety";
+  }
+
+  async function loadLiveOSM() {
+    // Pre-generated file wins if present (window.OSM_SHOPS from fetch-shops.mjs).
+    let incoming = Array.isArray(window.OSM_SHOPS) ? window.OSM_SHOPS : null;
+    if (!incoming) {
+      const bbox = "35.6530,139.6930,35.6700,139.7080";
+      const q = `[out:json][timeout:40];(node["shop"]["name"](${bbox});` +
+        `node["amenity"~"^(cafe|restaurant|fast_food|bar|pub)$"]["name"](${bbox});` +
+        `node["tourism"~"^(attraction|viewpoint|gallery|museum)$"]["name"](${bbox}););out body;`;
+      try {
+        const res = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "data=" + encodeURIComponent(q),
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        incoming = json.elements.map((el) => {
+          const t = el.tags || {}; const name = t["name:en"] || t.name; if (!name) return null;
+          return { id: "osm-" + el.id, name, jp: t.name && t.name !== name ? t.name : "",
+            category: osmCategory(t), lat: el.lat, lng: el.lon,
+            hours: t.opening_hours || "", website: t.website || "",
+            desc: (t.shop || t.amenity || t.tourism || "shop").replace(/_/g, " "),
+            tip: t.website ? "Website: " + t.website : "" };
+        }).filter(Boolean);
+      } catch (e) {
+        toast("Live OSM data unavailable — showing curated spots.");
+        return;
+      }
+    }
+    const have = new Set(SPOTS.map((s) => s.id));
+    let added = 0;
+    incoming.forEach((s) => {
+      if (s.lat == null || s.lng == null || have.has(s.id)) return;
+      SPOTS.push(s); SPOT_BY_ID[s.id] = s; have.add(s.id); added++;
+    });
+    if (added) { renderMarkers(); renderShops(); toast(`Loaded ${added} more shops from OpenStreetMap`); }
+  }
+
   // ---- Init ----
   renderRoutes();
   renderFilters();
@@ -535,6 +588,7 @@
   renderActive();
   renderMarkers();
   startGeolocation();
+  loadLiveOSM();
 
   // Re-fit map on orientation/resize
   window.addEventListener("resize", () => setTimeout(() => map.invalidateSize(), 200));
