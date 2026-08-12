@@ -19,11 +19,14 @@
     markers: {},            // id -> Leaflet marker
     routeLine: null,        // Leaflet polyline
     legLine: null,          // line from me -> current target
+    follow: false,          // keep the map centered on me while walking
   };
 
   // ---- Map ----
   const map = L.map("map", { zoomControl: false, attributionControl: true }).setView(SHIBUYA_CENTER, 16);
   L.control.zoom({ position: "bottomright" }).addTo(map);
+  // Manual drag releases follow-me so the user can look around.
+  map.on("dragstart", () => { if (state.follow) { state.follow = false; setFollowUI(false); } });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors',
@@ -124,16 +127,19 @@
   });
 
   // ---- GPS ----
+  let watchId = null;
   function startGeolocation() {
     if (!("geolocation" in navigator)) {
       toast("Geolocation not supported on this device.");
       return;
     }
-    navigator.geolocation.watchPosition(onPosition, onPosError, {
-      enableHighAccuracy: true,
-      maximumAge: 2000,
-      timeout: 15000,
-    });
+    if (watchId == null) {
+      watchId = navigator.geolocation.watchPosition(onPosition, onPosError, {
+        enableHighAccuracy: true,
+        maximumAge: 2000,
+        timeout: 15000,
+      });
+    }
     requestHeading();
   }
 
@@ -144,8 +150,14 @@
       state.heading = pos.coords.heading;
     }
     drawMe();
+    if (state.follow) map.panTo([latitude, longitude], { animate: true, duration: 0.5 });
     updateGuidance();
     refreshShopDistances();
+  }
+
+  function setFollowUI(on) {
+    const b = document.getElementById("btn-locate");
+    if (b) b.classList.toggle("following", on && !!state.me);
   }
 
   function onPosError(err) {
@@ -468,7 +480,7 @@
   }
 
   function recenter() {
-    if (state.me) map.setView([state.me.lat, state.me.lng], 17);
+    if (state.me) { state.follow = true; setFollowUI(true); map.setView([state.me.lat, state.me.lng], 17); }
     else { map.setView(SHIBUYA_CENTER, 16); toast("No GPS fix yet — showing Shibuya center."); }
   }
 
@@ -520,10 +532,15 @@
         typeof DeviceOrientationEvent.requestPermission === "function") {
       DeviceOrientationEvent.requestPermission().catch(() => {});
     }
+    state.follow = true; setFollowUI(true);
     if (state.me) { recenter(); }
-    else { toast("Getting your location…"); }
-    // ensure watch is running
-    startGeolocation();
+    else {
+      toast("Getting your location…");
+      // getCurrentPosition reliably surfaces the browser permission prompt.
+      if ("geolocation" in navigator)
+        navigator.geolocation.getCurrentPosition(onPosition, onPosError, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    }
+    startGeolocation(); // ensure the continuous watch is running
   });
 
   document.getElementById("g-next").addEventListener("click", nextStop);

@@ -199,12 +199,25 @@ body {
 .pin span { transform: rotate(45deg); font-size: 12px; color: #fff; }
 .pin.active-pin { outline: 3px solid rgba(56,189,248,.6); }
 
-/* User location dot */
+/* User location dot (pulses so it's obviously live while walking) */
 .me-dot {
-  width: 18px; height: 18px; border-radius: 50%;
+  width: 20px; height: 20px; border-radius: 50%;
   background: #38bdf8; border: 3px solid #fff;
-  box-shadow: 0 0 0 6px rgba(56,189,248,.25);
+  box-shadow: 0 0 0 4px rgba(56,189,248,.35);
+  position: relative;
 }
+.me-dot::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 50%;
+  border: 2px solid #38bdf8; animation: mePulse 1.6s ease-out infinite;
+}
+@keyframes mePulse {
+  0%   { transform: scale(1);   opacity: .7; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .me-dot::after { animation: none; } }
+
+/* Locate button while following */
+#btn-locate.following { box-shadow: 0 0 0 3px rgba(56,189,248,.6); border-color: var(--accent); }
 
 .leaflet-popup-content-wrapper { background: var(--panel-2); color: var(--text); border-radius: 12px; }
 .leaflet-popup-tip { background: var(--panel-2); }
