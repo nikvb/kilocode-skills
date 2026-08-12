@@ -141,6 +141,21 @@
   }
   #placehint.on { display: block; }
 
+  /* Location banner */
+  #locbanner {
+    position: absolute; left: 12px; right: 12px; z-index: 9;
+    bottom: calc(var(--sheet, 46vh) + 14px);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+    padding: 14px 15px; box-shadow: var(--shadow); display: none; transition: bottom .28s;
+  }
+  #locbanner.on { display: block; }
+  .lb-title { font-weight: 800; font-size: 15px; }
+  .lb-msg { color: var(--muted); font-size: 12.8px; margin-top: 4px; line-height: 1.45; }
+  .lb-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+  /* Locate button "following" state */
+  #btn-locate.following { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gps) 45%, transparent); }
+
   /* Bottom sheet */
   #sheet {
     position: absolute; left: 0; right: 0; bottom: 0; z-index: 8;
@@ -264,6 +279,17 @@
   </div>
 
   <div id="placehint">Tap the map to drop your location</div>
+
+  <div id="locbanner">
+    <div class="lb-title" id="lb-title">📍 Show my location</div>
+    <div class="lb-msg" id="lb-msg">Turn on GPS to see your dot and have the map follow you as you walk.</div>
+    <div class="lb-row">
+      <button class="btn primary small" id="lb-enable">Enable GPS</button>
+      <button class="btn ghost small" id="lb-tab" style="display:none">Open in new tab ↗</button>
+      <button class="btn ghost small" id="lb-map">Set on map</button>
+      <button class="btn ghost small" id="lb-x">Dismiss</button>
+    </div>
+  </div>
 
   <div id="mapctl">
     <button class="btn icon" id="ctl-in" title="Zoom in">＋</button>
@@ -408,6 +434,7 @@ const state = {
   filters: new Set(Object.keys(CATEGORIES)),
   query: "",
   placeMode: false, demo: null,
+  follow: false, pulse: 0,
   view: { cx: STATION.lat, cy: STATION.lng, ppm: 0.9 }, // ppm = pixels per metre
 };
 
@@ -517,20 +544,23 @@ function draw(){
     }
   });
 
-  // me
+  // me (live GPS dot)
   if(state.me){
-    const p=project(state.me.lat,state.me.lng);
-    if(state.me.accuracy){ ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(6,state.me.accuracy*state.view.ppm),0,7);
-      ctx.fillStyle=c("--gps")+"22"; ctx.fill(); ctx.strokeStyle=c("--gps")+"66"; ctx.stroke(); }
-    ctx.beginPath(); ctx.arc(p.x,p.y,7,0,7); ctx.fillStyle=c("--gps"); ctx.fill();
-    ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.stroke();
-    if(state.heading!=null){ // heading wedge
-      const h=rad(state.heading); ctx.beginPath();
-      ctx.moveTo(p.x+Math.sin(h)*7, p.y-Math.cos(h)*7);
-      ctx.lineTo(p.x+Math.sin(h-0.4)*17, p.y-Math.cos(h-0.4)*17);
-      ctx.lineTo(p.x+Math.sin(h+0.4)*17, p.y-Math.cos(h+0.4)*17);
-      ctx.closePath(); ctx.fillStyle=c("--gps"); ctx.fill();
-    }
+    const p=project(state.me.lat,state.me.lng), gps=c("--gps");
+    if(state.me.accuracy){ ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(8,state.me.accuracy*state.view.ppm),0,7);
+      ctx.fillStyle=gps+"22"; ctx.fill(); ctx.strokeStyle=gps+"55"; ctx.lineWidth=1; ctx.stroke(); }
+    // pulsing "live" ring
+    const pr=10+state.pulse*26, pa=1-state.pulse;
+    ctx.beginPath(); ctx.arc(p.x,p.y,pr,0,7); ctx.strokeStyle=gps; ctx.globalAlpha=0.55*pa; ctx.lineWidth=3; ctx.stroke(); ctx.globalAlpha=1;
+    // heading wedge under the dot
+    if(state.heading!=null){ const h=rad(state.heading); ctx.beginPath();
+      ctx.moveTo(p.x+Math.sin(h)*8, p.y-Math.cos(h)*8);
+      ctx.lineTo(p.x+Math.sin(h-0.42)*20, p.y-Math.cos(h-0.42)*20);
+      ctx.lineTo(p.x+Math.sin(h+0.42)*20, p.y-Math.cos(h+0.42)*20);
+      ctx.closePath(); ctx.fillStyle=gps; ctx.globalAlpha=.85; ctx.fill(); ctx.globalAlpha=1; }
+    // solid dot with white halo
+    ctx.beginPath(); ctx.arc(p.x,p.y,9,0,7); ctx.fillStyle="#fff"; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,6.5,0,7); ctx.fillStyle=gps; ctx.fill();
   }
 }
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
@@ -557,6 +587,7 @@ canvas.addEventListener("wheel",e=>{ e.preventDefault(); const r=canvas.getBound
   zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:0.89); },{passive:false});
 
 function panPx(dx,dy){ const mLat=111320, mLng=111320*Math.cos(rad(state.view.cx));
+  if(state.follow){ state.follow=false; setFollowUI(false); } // manual pan breaks follow
   state.view.cy -= dx/state.view.ppm/mLng; state.view.cx += dy/state.view.ppm/mLat; draw(); }
 function zoomAt(px,py,f){ const before=unproject(px,py); state.view.ppm=Math.max(0.15,Math.min(12,state.view.ppm*f));
   const after=unproject(px,py); state.view.cx+=before.lat-after.lat; state.view.cy+=before.lng-after.lng; draw(); }
@@ -613,33 +644,74 @@ function setArrow(b){ const a=$("#arrow"); if(b==null||!state.me){ a.style.trans
   const rel = state.heading!=null ? (b-state.heading+360)%360 : b; a.style.transform=`rotate(${rel}deg)`; }
 
 /* -------------------------------------------------------------------- GPS */
-let watchId=null, gpsTimer=null;
-function startGPS(){
-  if(!("geolocation" in navigator)){ enablePlaceFallback("This browser has no geolocation."); return; }
-  if(watchId!=null) return;
-  clearTimeout(gpsTimer);
-  gpsTimer=setTimeout(()=>{ if(!state.me) enablePlaceFallback("No GPS fix yet."); }, 8000);
-  try{
-    watchId=navigator.geolocation.watchPosition(pos=>{
-      clearTimeout(gpsTimer);
-      const {latitude,longitude,accuracy,heading}=pos.coords;
-      if(typeof heading==="number" && !isNaN(heading)) state.heading=heading;
-      setMe({lat:latitude,lng:longitude,accuracy});
-    }, err=>{
-      const m={1:"Location permission denied.",2:"Location unavailable.",3:"Location timed out."};
-      enablePlaceFallback(m[err.code]||"Location error.");
-    }, { enableHighAccuracy:true, maximumAge:2000, timeout:15000 });
-  }catch(_){ enablePlaceFallback("Geolocation blocked in this frame."); }
-  requestHeading();
-}
-function setMe(m){ const first=!state.me; state.me=m; if(first) toast("Location found ✓");
-  updateGuide(); draw(); if(activeTab()==="shops") renderShops(); }
+let watchId=null, pulseTimer=null;
+const inIframe = (()=>{ try { return window.self!==window.top; } catch(_){ return true; } })();
 
-function enablePlaceFallback(reason){
-  toast(reason+" Tap the map to set your location, or try Demo walk.", 4200);
-  setPlaceMode(true);
+/* User-gesture entry point: ask for permission, then track continuously. */
+function requestLocation(){
+  // iOS 13+ needs a gesture to request compass access too.
+  if(typeof DeviceOrientationEvent!=="undefined" && typeof DeviceOrientationEvent.requestPermission==="function")
+    DeviceOrientationEvent.requestPermission().catch(()=>{});
+  requestHeading();
+  state.follow=true; setFollowUI(true); setPlaceMode(false);
+  if(!("geolocation" in navigator)){ showBanner("no-api"); return; }
+  banner(false);
+  toast("Requesting location…");
+  // getCurrentPosition reliably surfaces the browser's permission prompt.
+  navigator.geolocation.getCurrentPosition(onPos, onGeoErr, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+  startWatch();
 }
+function startWatch(){
+  if(watchId!=null) return;
+  try{
+    watchId=navigator.geolocation.watchPosition(onPos, onGeoErr,
+      { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
+  }catch(_){ showBanner("blocked"); }
+}
+function onPos(pos){
+  const {latitude,longitude,accuracy,heading}=pos.coords;
+  if(typeof heading==="number" && !isNaN(heading)) state.heading=heading;
+  setMe({lat:latitude,lng:longitude,accuracy});
+}
+function onGeoErr(err){
+  // 1 = permission denied (user OR the embedding frame's policy), 2 = unavailable, 3 = timeout.
+  if(err.code===1){ showBanner("blocked"); }
+  else if(!state.me){ toast(err.code===3?"GPS is taking a while… still trying.":"Location unavailable — move to open sky.", 3600); }
+}
+function setMe(m){
+  const first=!state.me; state.me=m;
+  if(state.follow){ state.view.cx=m.lat; state.view.cy=m.lng; if(state.view.ppm<1.4) state.view.ppm=1.7; }
+  if(first){ toast("Location found ✓"); setFollowUI(true); }
+  banner(false); startPulse(); updateGuide(); draw();
+  if(activeTab()==="shops") renderShops();
+}
+
+/* live pulse so the dot is obviously tracking while walking */
+function startPulse(){ if(pulseTimer) return; pulseTimer=setInterval(()=>{ state.pulse=(state.pulse+0.045)%1; draw(); }, 70); }
+function stopPulse(){ if(pulseTimer){ clearInterval(pulseTimer); pulseTimer=null; } state.pulse=0; }
+
+function setFollowUI(on){ $("#btn-locate").classList.toggle("following",on && !!state.me); }
 function setPlaceMode(on){ state.placeMode=on; $("#placehint").classList.toggle("on",on); }
+
+/* Banner ------------------------------------------------------------------ */
+function banner(on){ $("#locbanner").classList.toggle("on",on); }
+function showBanner(kind){
+  const tab=$("#lb-tab");
+  tab.style.display = (kind==="blocked" && inIframe) ? "" : "none";
+  if(kind==="no-api"){
+    $("#lb-title").textContent="📍 GPS unavailable";
+    $("#lb-msg").textContent="This browser can't provide location. Tap the map to set your spot, or run a Demo walk.";
+  } else if(kind==="blocked"){
+    $("#lb-title").textContent="📍 Location is blocked";
+    $("#lb-msg").innerHTML = inIframe
+      ? "No prompt appeared — the embedded view is blocking GPS. <b>Open in a new tab</b> to allow it, or set your spot on the map."
+      : "Location permission is denied. Enable it for this site in your browser's address-bar settings, then tap Enable GPS again.";
+  } else {
+    $("#lb-title").textContent="📍 Show my location";
+    $("#lb-msg").textContent="Turn on GPS to see your dot and have the map follow you as you walk.";
+  }
+  banner(true);
+}
 
 function requestHeading(){
   function h(e){ let v=null;
@@ -653,7 +725,7 @@ function requestHeading(){
 /* Demo walk — animate along the active route so the app is usable without GPS */
 function startDemo(){
   const r=state.route; if(!r){ toast("Start a route first, then Demo walk."); return; }
-  stopDemo(); state.step=0; updateGuide();
+  stopDemo(); state.step=0; state.follow=true; banner(false); updateGuide();
   const legPts=r.stops.map(id=>BY_ID[id]); let i=0, t=0;
   state.demo=setInterval(()=>{
     const a=legPts[i], b=legPts[i+1]; if(!b){ stopDemo(); toast("Demo finished."); return; }
@@ -775,11 +847,15 @@ $("#grip").onclick=()=>{ sheetIdx=(sheetIdx+1)%order.length; setSheet(order[shee
 
 /* --------------------------------------------------------------- controls */
 $("#btn-locate").onclick=()=>{
-  if(typeof DeviceOrientationEvent!=="undefined" && typeof DeviceOrientationEvent.requestPermission==="function")
-    DeviceOrientationEvent.requestPermission().catch(()=>{});
-  if(state.me){ state.view.cx=state.me.lat; state.view.cy=state.me.lng; state.view.ppm=Math.max(state.view.ppm,1.6); draw(); }
-  startGPS();
+  if(state.me){ // already tracking → re-enable follow and recenter
+    state.follow=true; setFollowUI(true);
+    state.view.cx=state.me.lat; state.view.cy=state.me.lng; state.view.ppm=Math.max(state.view.ppm,1.7); draw();
+  } else requestLocation();
 };
+$("#lb-enable").onclick=requestLocation;
+$("#lb-map").onclick=()=>{ banner(false); setPlaceMode(true); toast("Tap the map to drop your location."); };
+$("#lb-x").onclick=()=>banner(false);
+$("#lb-tab").onclick=()=>{ try{ window.open(location.href,"_blank","noopener"); }catch(_){ toast("Open this page's URL in a new browser tab."); } };
 $("#ctl-in").onclick=()=>zoomAt(W/2,H/2,1.25);
 $("#ctl-out").onclick=()=>zoomAt(W/2,H/2,0.8);
 $("#ctl-fit").onclick=()=>fitAll();
@@ -805,5 +881,20 @@ new ResizeObserver(()=>resize()).observe(canvas);
 renderRoutes(); renderFilters(); renderShops(); renderWalk();
 setSheet("peek");
 requestAnimationFrame(()=>{ resize(); fitAll(); });
-startGPS();
+
+/* Preflight: if permission was already granted, start tracking silently;
+   otherwise show the Enable-GPS banner and wait for a tap (a gesture makes
+   the browser prompt reliable, especially inside an embedded frame). */
+(function preflight(){
+  if(!("geolocation" in navigator)){ showBanner("no-api"); return; }
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({name:"geolocation"}).then(st=>{
+      if(st.state==="granted"){ state.follow=true; setFollowUI(true); requestHeading(); startWatch();
+        navigator.geolocation.getCurrentPosition(onPos, onGeoErr, {enableHighAccuracy:true,timeout:15000,maximumAge:0}); }
+      else if(st.state==="denied"){ showBanner("blocked"); }
+      else { showBanner("prompt"); }
+      st.onchange=()=>{ if(st.state==="granted") requestLocation(); };
+    }).catch(()=>showBanner("prompt"));
+  } else { showBanner("prompt"); }
+})();
 </script>
