@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Shibuya Walk — GPS store guide</title>
+  <meta name="description" content="Walk around Shibuya, Tokyo with live GPS, curated store info and suggested routes." />
+
+  <!-- Leaflet map library (vendored locally — no CDN needed) -->
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <script src="vendor/leaflet/leaflet.js"></script>
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- Top bar -->
+    <header id="topbar">
+      <div class="brand">
+        <span class="brand-mark">渋</span>
+        <div class="brand-text">
+          <strong>Shibuya Walk</strong>
+          <small>GPS store guide</small>
+        </div>
+      </div>
+      <button id="btn-locate" class="pill" title="Center on my location">📍 Locate me</button>
+    </header>
+
+    <!-- Live guidance banner (hidden until a route/target is active) -->
+    <div id="guidance" class="hidden">
+      <div class="g-arrow"><span id="g-arrow-glyph">↑</span></div>
+      <div class="g-body">
+        <div class="g-title" id="g-title">—</div>
+        <div class="g-sub" id="g-sub">Start a route or tap a shop</div>
+      </div>
+      <button id="g-next" class="pill small" title="Skip to next stop">Next ›</button>
+    </div>
+
+    <!-- Bottom sheet -->
+    <section id="sheet" class="sheet">
+      <div class="sheet-handle" id="sheet-handle"></div>
+
+      <div class="sheet-tabs">
+        <button class="tab active" data-tab="routes">Routes</button>
+        <button class="tab" data-tab="shops">Shops</button>
+        <button class="tab" data-tab="active">Active walk</button>
+      </div>
+
+      <div class="sheet-content">
+        <!-- Routes tab -->
+        <div class="tab-panel" data-panel="routes"></div>
+
+        <!-- Shops tab -->
+        <div class="tab-panel hidden" data-panel="shops">
+          <div class="filter-row" id="filter-row"></div>
+          <div class="shop-list" id="shop-list"></div>
+        </div>
+
+        <!-- Active walk tab -->
+        <div class="tab-panel hidden" data-panel="active">
+          <div id="active-empty" class="empty">No active route. Pick one from the <b>Routes</b> tab.</div>
+          <div id="active-list" class="active-list"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Location permission / status toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

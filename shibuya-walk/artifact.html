@@ -1,0 +1,900 @@
+<title>Shibuya Walk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<style>
+  :root {
+    /* light ("daytime map") */
+    --bg: #eceef4;
+    --map-bg: #e7ebf2;
+    --map-grid: #d4dae6;
+    --map-ink: #aab4c6;
+    --surface: #ffffff;
+    --surface-2: #f2f4fa;
+    --line: #dde2ec;
+    --text: #141824;
+    --muted: #5c6576;
+    --accent: #e11d54;
+    --accent-ink: #ffffff;
+    --gps: #0a92ad;
+    --route: #d9480f;
+    --station: #ccd4e2;
+    --shadow: 0 10px 30px rgba(20,30,60,.14);
+    color-scheme: light;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #080b13;
+      --map-bg: #05070d;
+      --map-grid: #121a2a;
+      --map-ink: #33405a;
+      --surface: #0f1521;
+      --surface-2: #151d2c;
+      --line: #24304a;
+      --text: #eef2f9;
+      --muted: #8a95a8;
+      --accent: #ff2e63;
+      --accent-ink: #14030b;
+      --gps: #35d6ef;
+      --route: #ffab4d;
+      --station: #1a2438;
+      --shadow: 0 14px 40px rgba(0,0,0,.55);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #080b13;
+    --map-bg: #05070d;
+    --map-grid: #121a2a;
+    --map-ink: #33405a;
+    --surface: #0f1521;
+    --surface-2: #151d2c;
+    --line: #24304a;
+    --text: #eef2f9;
+    --muted: #8a95a8;
+    --accent: #ff2e63;
+    --accent-ink: #14030b;
+    --gps: #35d6ef;
+    --route: #ffab4d;
+    --station: #1a2438;
+    --shadow: 0 14px 40px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Helvetica Neue", "Arial Nova", "Segoe UI", system-ui, -apple-system,
+                 "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace; font-variant-numeric: tabular-nums; }
+
+  #stage { position: fixed; inset: 0; }
+  /* canvas is a replaced element: it MUST have explicit CSS width/height, or
+     inset:0 falls back to its intrinsic (attribute) size and the backing-store
+     resize feeds back into layout. width/height:100% pins it to #stage. */
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* Top wayfinding bar */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px calc(28px);
+    background: linear-gradient(to bottom, var(--bg) 8%, color-mix(in srgb, var(--bg) 30%, transparent) 70%, transparent);
+    pointer-events: none;
+  }
+  #topbar > * { pointer-events: auto; }
+  .wordmark { display: flex; align-items: center; gap: 11px; }
+  .wm-badge {
+    width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 25px; font-weight: 800; letter-spacing: -1px;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .wm-text b { font-size: 17px; letter-spacing: .3px; display: block; line-height: 1; }
+  .wm-text small { display: block; color: var(--muted); font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; margin-top: 4px; }
+  .topbtns { display: flex; gap: 8px; }
+
+  .btn {
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    padding: 10px 13px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+    box-shadow: var(--shadow); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn:active { transform: scale(.95); }
+  .btn.icon { padding: 10px; width: 44px; height: 44px; justify-content: center; font-size: 17px; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn.small { padding: 7px 10px; font-size: 12px; border-radius: 10px; }
+  .btn.ghost { background: var(--surface-2); }
+
+  /* Guidance strip */
+  #guide {
+    position: absolute; left: 12px; right: 12px; top: 78px; z-index: 5;
+    display: none; align-items: center; gap: 13px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  #guide.on { display: flex; }
+  .compass {
+    width: 54px; height: 54px; flex: 0 0 auto; border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--gps) 88%, white), var(--gps));
+    display: grid; place-items: center; position: relative;
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--gps) 22%, transparent);
+  }
+  .compass .arrow { font-size: 27px; line-height: 1; color: #041016; transition: transform .35s cubic-bezier(.22,1,.36,1); }
+  .g-body { flex: 1; min-width: 0; }
+  .g-name { font-weight: 800; font-size: 15.5px; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .g-sub b { color: var(--text); }
+
+  /* Floating map controls */
+  #mapctl { position: absolute; right: 12px; bottom: calc(var(--sheet, 46vh) + 14px); z-index: 4; display: flex; flex-direction: column; gap: 8px; transition: bottom .28s cubic-bezier(.22,1,.36,1); }
+  #mapctl .btn.icon { background: var(--surface); }
+
+  /* place-mode hint */
+  #placehint {
+    position: absolute; left: 50%; transform: translateX(-50%); top: 78px; z-index: 6;
+    background: var(--text); color: var(--bg); font-size: 12.5px; font-weight: 700;
+    padding: 9px 14px; border-radius: 999px; box-shadow: var(--shadow); display: none;
+  }
+  #placehint.on { display: block; }
+
+  /* Location banner */
+  #locbanner {
+    position: absolute; left: 12px; right: 12px; z-index: 9;
+    bottom: calc(var(--sheet, 46vh) + 14px);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+    padding: 14px 15px; box-shadow: var(--shadow); display: none; transition: bottom .28s;
+  }
+  #locbanner.on { display: block; }
+  .lb-title { font-weight: 800; font-size: 15px; }
+  .lb-msg { color: var(--muted); font-size: 12.8px; margin-top: 4px; line-height: 1.45; }
+  .lb-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+  /* Locate button "following" state */
+  #btn-locate.following { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gps) 45%, transparent); }
+
+  /* Bottom sheet */
+  #sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 8;
+    height: var(--sheet, 46vh);
+    background: var(--surface); border-top: 1px solid var(--line);
+    border-radius: 22px 22px 0 0; box-shadow: 0 -12px 40px color-mix(in srgb, var(--text) 12%, transparent);
+    display: flex; flex-direction: column;
+    transition: height .28s cubic-bezier(.22,1,.36,1);
+  }
+  #grip { width: 42px; height: 5px; border-radius: 999px; background: var(--line); margin: 10px auto 6px; cursor: grab; flex: 0 0 auto; }
+  .tabs { display: flex; gap: 6px; padding: 2px 12px 10px; flex: 0 0 auto; }
+  .tab { flex: 1; border: none; background: transparent; color: var(--muted); padding: 9px 6px; border-radius: 11px;
+    font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: .2px; }
+  .tab.on { background: var(--surface-2); color: var(--text); }
+  .tab .count { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2px 12px 20px; -webkit-overflow-scrolling: touch; }
+  .panel { display: none; }
+  .panel.on { display: block; }
+
+  /* Route cards */
+  .route {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px;
+    padding: 13px 15px; margin-bottom: 11px; cursor: pointer;
+  }
+  .route.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .route h3 { margin: 0 0 3px; font-size: 15.5px; display: flex; align-items: center; gap: 9px; }
+  .route .meta { color: var(--muted); font-size: 12px; margin-bottom: 7px; letter-spacing: .3px; }
+  .route p { margin: 0 0 9px; font-size: 13px; color: color-mix(in srgb, var(--text) 82%, transparent); line-height: 1.45; }
+  .route .path { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 0 0 11px; }
+  .route .start { display: inline-block; background: var(--accent); color: var(--accent-ink); font-weight: 800;
+    padding: 8px 15px; border-radius: 999px; font-size: 12.5px; }
+
+  /* Filters + shop list */
+  .filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 2px 0 12px; }
+  .chip { border: 1px solid var(--line); background: var(--surface-2); color: var(--muted);
+    padding: 6px 11px; border-radius: 999px; font-size: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .chip.on { color: var(--text); border-color: color-mix(in srgb, var(--text) 30%, transparent); }
+  .searchwrap { position: relative; margin-bottom: 10px; }
+  .searchwrap input { width: 100%; border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    border-radius: 12px; padding: 11px 12px; font-size: 14px; }
+  .searchwrap input::placeholder { color: var(--muted); }
+
+  .list { display: flex; flex-direction: column; gap: 9px; }
+  .item { display: flex; gap: 11px; align-items: flex-start; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; cursor: pointer; }
+  .badge { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 9px; display: grid; place-items: center; font-size: 15px; color: #06121f; font-weight: 800; }
+  .imain { flex: 1; min-width: 0; }
+  .imain h4 { margin: 0; font-size: 14px; }
+  .imain .jp { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .imain .d { color: color-mix(in srgb, var(--text) 80%, transparent); font-size: 12.5px; margin-top: 4px; line-height: 1.4; }
+  .imain .hrs { color: var(--muted); font-size: 11.5px; margin-top: 5px; }
+  .imain .go { margin-top: 7px; display: inline-block; font-size: 12px; color: var(--accent); font-weight: 800; }
+  .idist { flex: 0 0 auto; text-align: right; color: var(--gps); font-size: 13px; font-weight: 800; }
+  .idist small { display: block; color: var(--muted); font-weight: 600; font-size: 10.5px; margin-top: 1px; }
+
+  /* Active walk */
+  .walk-head { display: flex; align-items: baseline; justify-content: space-between; margin: 4px 0 10px; }
+  .walk-head h3 { margin: 0; font-size: 15.5px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .toolbar .btn { flex: 1; justify-content: center; }
+  .btn.danger { color: #ff6b6b; border-color: color-mix(in srgb, #ff6b6b 40%, var(--line)); background: var(--surface-2); }
+  .step { display: flex; gap: 11px; align-items: center; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; margin-bottom: 8px; cursor: pointer; }
+  .step.done { opacity: .5; }
+  .step.current { border-color: var(--gps); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gps) 28%, transparent); }
+  .snum { width: 27px; height: 27px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center;
+    font-size: 12px; font-weight: 800; background: var(--line); color: var(--text); }
+  .step.current .snum { background: var(--gps); color: #04121a; }
+  .sbody { flex: 1; min-width: 0; }
+  .sbody h4 { margin: 0; font-size: 14px; }
+  .sbody small { color: var(--muted); font-size: 11.5px; }
+  .sdist { color: var(--gps); font-weight: 800; font-size: 12.5px; }
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 34px 12px; line-height: 1.5; }
+
+  /* POI popup card */
+  #poi { position: absolute; z-index: 7; left: 12px; right: 12px; bottom: calc(var(--sheet, 46vh) + 14px);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+    padding: 14px 15px; display: none; transition: bottom .28s; }
+  #poi.on { display: block; }
+  #poi .close { position: absolute; top: 10px; right: 12px; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
+  #poi .cat { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; }
+  #poi h3 { margin: 5px 0 2px; font-size: 17px; padding-right: 24px; }
+  #poi .jp { color: var(--muted); font-size: 12.5px; }
+  #poi .d { font-size: 13px; margin-top: 8px; line-height: 1.45; color: color-mix(in srgb, var(--text) 85%, transparent); }
+  #poi .row { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  #poi .cta { margin-top: 12px; display: flex; gap: 8px; }
+
+  /* toast */
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--sheet, 46vh) + 78px);
+    z-index: 20; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600;
+    padding: 10px 16px; border-radius: 12px; max-width: 86vw; text-align: center; box-shadow: var(--shadow);
+    opacity: 0; pointer-events: none; transition: opacity .25s; }
+  #toast.on { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  :focus-visible { outline: 2px solid var(--gps); outline-offset: 2px; }
+</style>
+
+<div id="stage">
+  <canvas id="map"></canvas>
+
+  <header id="topbar">
+    <div class="wordmark">
+      <div class="wm-badge">渋</div>
+      <div class="wm-text"><b>Shibuya Walk</b><small>foot map · gps</small></div>
+    </div>
+    <div class="topbtns">
+      <button class="btn icon ghost" id="btn-theme" title="Toggle light / dark">◐</button>
+      <button class="btn primary" id="btn-locate">📍 Locate</button>
+    </div>
+  </header>
+
+  <div id="guide">
+    <div class="compass"><span class="arrow" id="arrow">↑</span></div>
+    <div class="g-body">
+      <div class="g-name" id="g-name">—</div>
+      <div class="g-sub" id="g-sub">Pick a route or a shop to begin</div>
+    </div>
+    <button class="btn small primary" id="g-next">Next ›</button>
+  </div>
+
+  <div id="placehint">Tap the map to drop your location</div>
+
+  <div id="locbanner">
+    <div class="lb-title" id="lb-title">📍 Show my location</div>
+    <div class="lb-msg" id="lb-msg">Turn on GPS to see your dot and have the map follow you as you walk.</div>
+    <div class="lb-row">
+      <button class="btn primary small" id="lb-enable">Enable GPS</button>
+      <button class="btn ghost small" id="lb-tab" style="display:none">Open in new tab ↗</button>
+      <button class="btn ghost small" id="lb-map">Set on map</button>
+      <button class="btn ghost small" id="lb-x">Dismiss</button>
+    </div>
+  </div>
+
+  <div id="mapctl">
+    <button class="btn icon" id="ctl-in" title="Zoom in">＋</button>
+    <button class="btn icon" id="ctl-out" title="Zoom out">－</button>
+    <button class="btn icon" id="ctl-fit" title="Fit all">⤢</button>
+  </div>
+
+  <div id="poi">
+    <span class="close" id="poi-close">✕</span>
+    <div class="cat" id="poi-cat"></div>
+    <h3 id="poi-name"></h3>
+    <div class="jp" id="poi-jp"></div>
+    <div class="d" id="poi-d"></div>
+    <div class="row" id="poi-hrs"></div>
+    <div class="row" id="poi-tip"></div>
+    <div class="cta">
+      <button class="btn primary small" id="poi-go">Guide me here →</button>
+      <button class="btn ghost small" id="poi-web" style="display:none">Website ↗</button>
+    </div>
+  </div>
+
+  <section id="sheet">
+    <div id="grip"></div>
+    <div class="tabs">
+      <button class="tab on" data-tab="routes">Routes</button>
+      <button class="tab" data-tab="shops">Shops <span class="count" id="shops-count"></span></button>
+      <button class="tab" data-tab="walk">Walk</button>
+    </div>
+    <div class="content">
+      <div class="panel on" data-panel="routes" id="p-routes"></div>
+      <div class="panel" data-panel="shops">
+        <div class="searchwrap"><input id="search" type="search" placeholder="Search shops…" autocomplete="off" /></div>
+        <div class="filters" id="filters"></div>
+        <div class="list" id="shoplist"></div>
+      </div>
+      <div class="panel" data-panel="walk" id="p-walk"></div>
+    </div>
+  </section>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   Shibuya Walk — self-contained walking guide.
+   Map is drawn on <canvas> from real WGS84 coordinates (no external tiles),
+   so distances, bearings and route lines are all metrically accurate.
+   Store data below is a curated seed; scripts/fetch-shops.mjs regenerates the
+   full set from OpenStreetMap (Overpass) when the app is hosted with internet.
+   ========================================================================== */
+
+const CATEGORIES = {
+  landmark:    { label: "Landmark",     color: "#ff4d6d", icon: "★" },
+  viewpoint:   { label: "Viewpoint",    color: "#34d3ee", icon: "◎" },
+  department:  { label: "Department",   color: "#a78bfa", icon: "▣" },
+  fashion:     { label: "Fashion",      color: "#f472b6", icon: "♦" },
+  electronics: { label: "Electronics",  color: "#60a5fa", icon: "▤" },
+  music:       { label: "Music",        color: "#fbbf24", icon: "♪" },
+  otaku:       { label: "Anime/Games",  color: "#4ade80", icon: "◆" },
+  variety:     { label: "Variety",      color: "#2dd4bf", icon: "❖" },
+  food:        { label: "Food & Drink", color: "#fb923c", icon: "◗" },
+  park:        { label: "Park",         color: "#a3e635", icon: "❀" },
+};
+
+const SEED = [
+  ["hachiko","Hachikō Statue","忠犬ハチ公像","landmark",35.65900,139.70058,"24h (outdoor)","The loyal-dog statue — Shibuya's #1 meeting point outside the station.","Every route starts near here."],
+  ["scramble","Shibuya Scramble Crossing","スクランブル交差点","landmark",35.65950,139.70042,"24h","The world's busiest pedestrian crossing — up to 3,000 people at once.","Best after dark; view from Magnet rooftop or the QFRONT Starbucks."],
+  ["shibuya109","SHIBUYA109","SHIBUYA109","fashion",35.65947,139.69835,"10:00–21:00","Iconic cylindrical tower of youth & street women's brands.","A landmark in itself — go up for trend-spotting."],
+  ["scramble-square","Shibuya Scramble Square","渋谷スクランブルスクエア","department",35.65799,139.70168,"10:00–21:00","47-storey tower on the station with shops, food halls and SHIBUYA SKY.","Take the lift to SHIBUYA SKY for the best crossing view."],
+  ["shibuya-sky","SHIBUYA SKY","渋谷スカイ","viewpoint",35.65790,139.70170,"10:00–22:30","Open-air rooftop deck 230m up, atop Scramble Square.","Book a timed ticket; sunset slots sell out."],
+  ["hikarie","Shibuya Hikarie","渋谷ヒカリエ","department",35.65913,139.70365,"10:00–21:00","Sleek shopping/culture tower with ShinQs and great food floors.","Basement food hall is superb for takeaway sweets."],
+  ["stream","Shibuya Stream","渋谷ストリーム","food",35.65640,139.70280,"~11:00–23:00","Riverside dining complex along the reopened Shibuya River.","Quieter meals away from the crossing crowds."],
+  ["tokyu-plaza","Tokyu Plaza Shibuya","東急プラザ渋谷","department",35.65760,139.69880,"10:00–21:00","'Fukuras' tower with lifestyle shops and a rooftop terrace.","Rooftop 'Shibu Niwa' garden is a calm break."],
+  ["mark-city","Shibuya Mark City","渋谷マークシティ","department",35.65810,139.69760,"10:00–21:00","Station-linked complex with shops and the Tokyu food arcade.","Handy covered route toward Dogenzaka."],
+  ["parco","Shibuya PARCO","渋谷パルコ","department",35.66263,139.69852,"11:00–21:00","Design-forward mall with fashion, art and a famous otaku 6F.","6F holds Nintendo TOKYO, Pokémon Center & Jump Shop."],
+  ["nintendo-tokyo","Nintendo TOKYO","Nintendo TOKYO","otaku",35.66263,139.69850,"11:00–21:00","Japan's first official Nintendo store (PARCO 6F).","Go at opening on weekends."],
+  ["pokemon-center","Pokémon Center SHIBUYA","ポケモンセンターシブヤ","otaku",35.66261,139.69848,"11:00–21:00","Shibuya's Pokémon flagship, guarded by a giant Mewtwo.","Great photo spot next to Nintendo TOKYO."],
+  ["jumpshop","JUMP SHOP Shibuya","ジャンプショップ","otaku",35.66260,139.69855,"11:00–21:00","Shonen Jump merch — One Piece, Dragon Ball & more (PARCO 6F).","Same floor as Nintendo & Pokémon."],
+  ["tower-records","Tower Records Shibuya","タワーレコード渋谷","music",35.66283,139.69894,"11:00–22:00","One of the world's largest music stores — 9 floors of CDs & vinyl.","Check the board for free in-store live shows."],
+  ["recofan","Recofan Shibuya","レコファン渋谷","music",35.66020,139.69760,"11:30–21:00","Big second-hand CD & vinyl floor in the BEAM building.","Deep bargain crates."],
+  ["disk-union","Disk Union Shibuya","ディスクユニオン渋谷","music",35.66018,139.69683,"11:00–21:00","Legendary used-record chain — rock, jazz, punk, rare vinyl.","Several genre branches within a block."],
+  ["mandarake","Mandarake Shibuya","まんだらけ渋谷","otaku",35.65965,139.69745,"12:00–20:00","Basement trove of used manga, cels, figures & collectibles.","In the BEAM building basement — easy to miss."],
+  ["village-vanguard","Village Vanguard Shibuya","ヴィレッジヴァンガード","variety",35.66110,139.69830,"11:00–22:00","Chaotic 'exciting bookstore' — books, toys, snacks, oddments.","Great for weird souvenirs."],
+  ["donki","MEGA Don Quijote Shibuya","MEGAドン・キホーテ","variety",35.66142,139.69752,"24h","Sprawling discount emporium — snacks, cosmetics, souvenirs.","Best late-night tax-free souvenir run."],
+  ["loft","Shibuya LOFT","渋谷ロフト","variety",35.66332,139.69788,"11:00–21:00","Six floors of stationery, design goods and lifestyle items.","Stationery floor is a must for gifts."],
+  ["hands","Hands Shibuya","ハンズ渋谷","variety",35.66360,139.69700,"10:00–21:00","DIY, travel, hobby & lifestyle megastore on split half-levels.","Follow the ramps between floors."],
+  ["seibu","Seibu Shibuya","西武渋谷店","department",35.66060,139.69850,"10:00–21:00","Classic department store spanning A & B buildings.","Depachika basement food is excellent."],
+  ["marui","Marui (0101) Shibuya","渋谷マルイ","department",35.66150,139.69870,"11:00–20:30","Mid-range fashion department store on Koen-dori.","Often hosts anime/character pop-ups."],
+  ["modi","Shibuya MODI","渋谷モディ","department",35.66250,139.69955,"11:00–21:00","Lifestyle complex with HMV&BOOKS and cafes.","HMV&BOOKS upstairs is a calm browse."],
+  ["bic-camera","Bic Camera Shibuya East","ビックカメラ渋谷東口","electronics",35.65790,139.70110,"10:00–21:00","Big-box electronics: cameras, gadgets, appliances, duty-free.","Passport = tax-free on ¥5,000+."],
+  ["labi","LABI Shibuya (Yamada)","ヤマダLABI渋谷","electronics",35.65900,139.69670,"10:00–22:00","Yamada Denki's Dogenzaka electronics megastore.","Good for adapters and travel gadgets."],
+  ["uniqlo","UNIQLO Shibuya","ユニクロ渋谷","fashion",35.66068,139.69960,"11:00–21:00","Large flagship of Japan's basics brand on Meiji-dori.","Grab UT graphic tees you won't find abroad."],
+  ["gu","GU Shibuya","ジーユー渋谷","fashion",35.66055,139.69985,"11:00–21:00","UNIQLO's trend-driven, budget sister brand.","Right by the UNIQLO flagship."],
+  ["zara","ZARA Shibuya","ザラ渋谷","fashion",35.66020,139.69895,"11:00–21:00","Global fast-fashion flagship near the station.","On the Meiji-dori shopping stretch."],
+  ["beams","BEAMS Shibuya","ビームス渋谷","fashion",35.66400,139.69770,"11:00–20:00","Influential Japanese select shop in the Jinnan district.","Cluster of boutiques nearby."],
+  ["gigo","GiGO Shibuya","GiGO渋谷","otaku",35.66050,139.69820,"10:00–23:30","Multi-floor arcade — crane games, rhythm games, purikura.","Top floors have the best UFO-catcher prizes."],
+  ["genki-sushi","Genki Sushi Shibuya","元気寿司渋谷","food",35.65830,139.69740,"11:00–23:00","Conveyor sushi ordered on a touchscreen, delivered by rail.","Fast, cheap, no reservation."],
+  ["ichiran","Ichiran Shibuya","一蘭渋谷","food",35.66140,139.69860,"24h","Famous tonkotsu ramen in solo 'flavour concentration' booths.","Buy a ticket from the vending machine first."],
+  ["nonbei","Nonbei Yokocho","のんべい横丁","food",35.65985,139.70180,"Evenings","Post-war alley of ~40 tiny bars beside the tracks.","Atmospheric after dark; some bars add a cover."],
+  ["center-gai","Center Gai","センター街","landmark",35.66040,139.69890,"24h","The buzzing pedestrian high street of youth culture.","Cut through it to reach most spots."],
+  ["qfront","QFRONT / TSUTAYA","QFRONT","landmark",35.65920,139.69980,"~07:00–22:30","The big-screen building; upstairs Starbucks has the classic view.","Grab a window seat to watch the scramble."],
+  ["magnet","MAGNET by SHIBUYA109","MAGNET by SHIBUYA109","viewpoint",35.65975,139.69955,"~11:00–21:00","'CROSSING VIEW' rooftop deck straight above the scramble.","Cheaper, closer crossing photo than SHIBUYA SKY."],
+  ["miyashita-park","MIYASHITA PARK","ミヤシタパーク","park",35.66080,139.70240,"Park 8–23","Rooftop park over a stylish mall with a street-food alley below.","Sunset lawn + climbing wall."],
+  ["shibuya-yokocho","Shibuya Yokocho","渋谷横丁","food",35.66130,139.70235,"~11–05","Neon food alley under Miyashita Park with regional eats.","Crawl dishes from different prefectures."],
+  ["cat-street","Cat Street","キャットストリート","fashion",35.66600,139.70400,"~11:00–20:00","Car-free boutique street toward Harajuku — streetwear & cafes.","Walk north to reach Harajuku in ~15 min."],
+  ["cerulean","Cerulean Tower","セルリアンタワー","landmark",35.65640,139.69720,"varies","Landmark hotel tower with high views, jazz club and noh theatre.","Upper-floor bar for a quiet skyline drink."],
+];
+
+const SPOTS = SEED.map(([id,name,jp,category,lat,lng,hours,desc,tip]) =>
+  ({ id, name, jp, category, lat, lng, hours, desc, tip }));
+const BY_ID = Object.fromEntries(SPOTS.map(s => [s.id, s]));
+
+const ROUTES = [
+  { id:"essentials", name:"Shibuya Essentials", emoji:"🌆", min:60,
+    blurb:"First-timer highlights: the crossing, 109, Center Gai and a rooftop view.",
+    stops:["hachiko","scramble","qfront","shibuya109","center-gai","magnet","miyashita-park"] },
+  { id:"otaku", name:"Anime, Games & Records", emoji:"🎮", min:90,
+    blurb:"Pop-culture crawl through record crates, collectibles and game floors.",
+    stops:["hachiko","mandarake","recofan","disk-union","tower-records","parco","nintendo-tokyo","pokemon-center","gigo"] },
+  { id:"shopping", name:"Shopping Spree", emoji:"🛍️", min:100,
+    blurb:"Department stores and variety megastores from the station up Koen-dori.",
+    stops:["scramble-square","hikarie","marui","modi","seibu","loft","hands","donki"] },
+  { id:"food-night", name:"Food & Nightlife", emoji:"🍶", min:80,
+    blurb:"Neon alleys and riverside eats — best from late afternoon into evening.",
+    stops:["hachiko","ichiran","nonbei","miyashita-park","shibuya-yokocho","center-gai","stream"] },
+];
+
+/* Decorative area labels (placed by real coords, purely for orientation) */
+const AREAS = [
+  { name:"CENTER GAI", lat:35.66030, lng:139.69880 },
+  { name:"DOGENZAKA", lat:35.65760, lng:139.69640 },
+  { name:"KOEN-DORI", lat:35.66200, lng:139.69950 },
+  { name:"JINNAN", lat:35.66350, lng:139.69850 },
+  { name:"UDAGAWACHO", lat:35.66150, lng:139.69700 },
+];
+const STATION = { lat:35.65830, lng:139.70090, name:"SHIBUYA STATION" };
+
+/* ------------------------------------------------------------------ state */
+const state = {
+  me: null, heading: null,
+  route: null, step: 0, target: null,
+  filters: new Set(Object.keys(CATEGORIES)),
+  query: "",
+  placeMode: false, demo: null,
+  follow: false, pulse: 0,
+  view: { cx: STATION.lat, cy: STATION.lng, ppm: 0.9 }, // ppm = pixels per metre
+};
+
+/* --------------------------------------------------------------- helpers */
+const R = 6371000, rad = d => d*Math.PI/180, deg = r => r*180/Math.PI;
+function distM(a,b){ const dLat=rad(b.lat-a.lat), dLng=rad(b.lng-a.lng), la1=rad(a.lat), la2=rad(b.lat);
+  const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function bearing(a,b){ const y=Math.sin(rad(b.lng-a.lng))*Math.cos(rad(b.lat));
+  const x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lng-a.lng));
+  return (deg(Math.atan2(y,x))+360)%360; }
+const fmtDist = m => m==null ? "—" : (m<1000 ? Math.round(m/5)*5+" m" : (m/1000).toFixed(m<10000?1:0)+" km");
+const walkMin = m => Math.max(1, Math.round(m/80));
+const COMPASS=["N","NE","E","SE","S","SW","W","NW"];
+const compass = d => COMPASS[Math.round(d/45)%8];
+const $ = s => document.querySelector(s);
+
+let toastT;
+function toast(msg,ms=2400){ const t=$("#toast"); t.textContent=msg; t.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),ms); }
+
+/* -------------------------------------------------------------- canvas map */
+const canvas = $("#map"), ctx = canvas.getContext("2d");
+let W=0, H=0, DPR=1;
+function resize(){ DPR=Math.min(2, window.devicePixelRatio||1); W=canvas.clientWidth; H=canvas.clientHeight;
+  canvas.width=W*DPR; canvas.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); draw(); }
+
+function project(lat,lng){
+  const mLat=111320, mLng=111320*Math.cos(rad(state.view.cx));
+  const ex=(lng-state.view.cy)*mLng, ny=(lat-state.view.cx)*mLat;
+  return { x: W/2 + ex*state.view.ppm, y: H/2 - ny*state.view.ppm };
+}
+function unproject(x,y){
+  const mLat=111320, mLng=111320*Math.cos(rad(state.view.cx));
+  const ex=(x-W/2)/state.view.ppm, ny=-(y-H/2)/state.view.ppm;
+  return { lat: state.view.cx + ny/mLat, lng: state.view.cy + ex/mLng };
+}
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function fitAll(pad=64){
+  const pts=SPOTS.map(s=>({lat:s.lat,lng:s.lng})); if(state.me) pts.push(state.me);
+  let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
+  pts.forEach(p=>{minLat=Math.min(minLat,p.lat);maxLat=Math.max(maxLat,p.lat);minLng=Math.min(minLng,p.lng);maxLng=Math.max(maxLng,p.lng);});
+  state.view.cx=(minLat+maxLat)/2; state.view.cy=(minLng+maxLng)/2;
+  const mLat=111320, mLng=111320*Math.cos(rad(state.view.cx));
+  const spanX=(maxLng-minLng)*mLng||300, spanY=(maxLat-minLat)*mLat||300;
+  state.view.ppm=Math.min((W-pad*2)/spanX,(H-pad*2.4)/spanY);
+  draw();
+}
+
+function draw(){
+  if(!W||!H) return;
+  const c=(v)=>css(v);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=c("--map-bg"); ctx.fillRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle=c("--map-grid"); ctx.lineWidth=1;
+  const gm=100*state.view.ppm; // 100m grid
+  if(gm>18){ const o=project(state.view.cx,state.view.cy);
+    let sx=o.x%gm; for(let x=sx;x<W;x+=gm){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    let sy=o.y%gm; for(let y=sy;y<H;y+=gm){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();} }
+
+  // station block
+  const st=project(STATION.lat,STATION.lng); const sw=Math.max(46,180*state.view.ppm), sh=Math.max(60,260*state.view.ppm);
+  ctx.fillStyle=c("--station"); roundRect(st.x-sw/2,st.y-sh/2,sw,sh,10); ctx.fill();
+  ctx.fillStyle=c("--map-ink"); ctx.font="700 10px system-ui"; ctx.textAlign="center";
+  ctx.fillText(STATION.name, st.x, st.y+3);
+
+  // scramble crossing X
+  const sc=project(35.6595,139.7004); ctx.strokeStyle=c("--map-ink"); ctx.lineWidth=Math.max(3,10*state.view.ppm);
+  ctx.globalAlpha=.5;
+  [[-1,-1,1,1],[-1,1,1,-1]].forEach(([a,b,d,e])=>{ctx.beginPath();ctx.moveTo(sc.x+a*22,sc.y+b*22);ctx.lineTo(sc.x+d*22,sc.y+e*22);ctx.stroke();});
+  ctx.globalAlpha=1; ctx.lineWidth=1;
+
+  // area labels
+  ctx.fillStyle=c("--map-ink"); ctx.font="700 10px system-ui"; ctx.textAlign="center";
+  ctx.globalAlpha=.65; AREAS.forEach(a=>{const p=project(a.lat,a.lng); ctx.fillText(a.name,p.x,p.y);}); ctx.globalAlpha=1;
+
+  // active route polyline
+  if(state.route){
+    const pts=state.route.stops.map(id=>project(BY_ID[id].lat,BY_ID[id].lng));
+    ctx.strokeStyle=c("--route"); ctx.lineWidth=4; ctx.lineJoin="round"; ctx.globalAlpha=.85;
+    ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // leg: me -> target
+  const tgt=currentTarget();
+  if(state.me && tgt){
+    const a=project(state.me.lat,state.me.lng), b=project(tgt.lat,tgt.lng);
+    ctx.strokeStyle=c("--gps"); ctx.lineWidth=3; ctx.setLineDash([2,9]); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // POIs
+  const activeId = tgt && tgt.id;
+  SPOTS.forEach(s=>{
+    if(!state.filters.has(s.category)) return;
+    const p=project(s.lat,s.lng), col=CATEGORIES[s.category].color;
+    const on = s.id===activeId;
+    const r = on?9:6;
+    if(on){ ctx.beginPath(); ctx.arc(p.x,p.y,r+6,0,7); ctx.fillStyle=col+"33"; ctx.fill(); }
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fillStyle=col; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=c("--map-bg"); ctx.stroke();
+    if(on || state.view.ppm>1.6){
+      ctx.fillStyle=css("--text"); ctx.font=(on?"800 12px ":"600 11px ")+"system-ui"; ctx.textAlign="left";
+      ctx.fillText(s.name, p.x+r+5, p.y+4);
+    }
+  });
+
+  // me (live GPS dot)
+  if(state.me){
+    const p=project(state.me.lat,state.me.lng), gps=c("--gps");
+    if(state.me.accuracy){ ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(8,state.me.accuracy*state.view.ppm),0,7);
+      ctx.fillStyle=gps+"22"; ctx.fill(); ctx.strokeStyle=gps+"55"; ctx.lineWidth=1; ctx.stroke(); }
+    // pulsing "live" ring
+    const pr=10+state.pulse*26, pa=1-state.pulse;
+    ctx.beginPath(); ctx.arc(p.x,p.y,pr,0,7); ctx.strokeStyle=gps; ctx.globalAlpha=0.55*pa; ctx.lineWidth=3; ctx.stroke(); ctx.globalAlpha=1;
+    // heading wedge under the dot
+    if(state.heading!=null){ const h=rad(state.heading); ctx.beginPath();
+      ctx.moveTo(p.x+Math.sin(h)*8, p.y-Math.cos(h)*8);
+      ctx.lineTo(p.x+Math.sin(h-0.42)*20, p.y-Math.cos(h-0.42)*20);
+      ctx.lineTo(p.x+Math.sin(h+0.42)*20, p.y-Math.cos(h+0.42)*20);
+      ctx.closePath(); ctx.fillStyle=gps; ctx.globalAlpha=.85; ctx.fill(); ctx.globalAlpha=1; }
+    // solid dot with white halo
+    ctx.beginPath(); ctx.arc(p.x,p.y,9,0,7); ctx.fillStyle="#fff"; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,6.5,0,7); ctx.fillStyle=gps; ctx.fill();
+  }
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+/* --------------------------------------------------------- map interaction */
+let drag=null, pointers=new Map(), pinchDist=0;
+canvas.addEventListener("pointerdown",e=>{ canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY}); drag={x:e.clientX,y:e.clientY,moved:0}; });
+canvas.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId)) return; pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size===2){ const [a,b]=[...pointers.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinchDist){ const mid={x:(a.x-canvas.getBoundingClientRect().left+ (b.x-canvas.getBoundingClientRect().left))/2,
+      y:(a.y-canvas.getBoundingClientRect().top + (b.y-canvas.getBoundingClientRect().top))/2};
+      zoomAt(mid.x,mid.y, d/pinchDist); } pinchDist=d; drag=null; return; }
+  if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy);
+    panPx(dx,dy); drag.x=e.clientX; drag.y=e.clientY; }
+});
+function endPtr(e){ pointers.delete(e.pointerId); if(pointers.size<2) pinchDist=0;
+  if(drag && drag.moved<6){ handleTap(e); } drag=null; }
+canvas.addEventListener("pointerup",endPtr);
+canvas.addEventListener("pointercancel",endPtr);
+canvas.addEventListener("wheel",e=>{ e.preventDefault(); const r=canvas.getBoundingClientRect();
+  zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:0.89); },{passive:false});
+
+function panPx(dx,dy){ const mLat=111320, mLng=111320*Math.cos(rad(state.view.cx));
+  if(state.follow){ state.follow=false; setFollowUI(false); } // manual pan breaks follow
+  state.view.cy -= dx/state.view.ppm/mLng; state.view.cx += dy/state.view.ppm/mLat; draw(); }
+function zoomAt(px,py,f){ const before=unproject(px,py); state.view.ppm=Math.max(0.15,Math.min(12,state.view.ppm*f));
+  const after=unproject(px,py); state.view.cx+=before.lat-after.lat; state.view.cy+=before.lng-after.lng; draw(); }
+
+function handleTap(e){
+  const r=canvas.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  if(state.placeMode){ const g=unproject(x,y); setMe({lat:g.lat,lng:g.lng,accuracy:15}); setPlaceMode(false);
+    toast("Location set. Guiding from here."); return; }
+  // hit-test POIs
+  let best=null,bd=22;
+  SPOTS.forEach(s=>{ if(!state.filters.has(s.category)) return; const p=project(s.lat,s.lng);
+    const d=Math.hypot(p.x-x,p.y-y); if(d<bd){bd=d;best=s;} });
+  if(best) openPoi(best); else closePoi();
+}
+
+/* ---------------------------------------------------------------- targets */
+function currentTarget(){ if(state.route) return BY_ID[state.route.stops[state.step]]||null;
+  if(state.target) return BY_ID[state.target]||null; return null; }
+
+function targetSpot(id){ state.route=null; state.step=0; state.target=id; stopDemo();
+  renderRoutes(); renderWalk(); updateGuide(); draw(); setTab("walk"); peekSheet();
+  const s=BY_ID[id]; centerOn(s); closePoi(); toast("Guiding to "+s.name); }
+
+function startRoute(id){ const r=ROUTES.find(x=>x.id===id); if(!r) return;
+  state.route=r; state.target=null; state.step=0; stopDemo();
+  renderRoutes(); renderWalk(); updateGuide(); fitAll(); setTab("walk"); peekSheet();
+  toast(`Started “${r.name}” · ${r.stops.length} stops`); }
+
+function nextStop(){ if(!state.route) return;
+  if(state.step<state.route.stops.length-1){ state.step++; renderWalk(); updateGuide(); draw();
+    centerOn(currentTarget()); toast("Next: "+currentTarget().name); }
+  else { toast("🏁 Route complete — enjoy Shibuya!"); endRoute(); } }
+
+function endRoute(){ state.route=null; state.target=null; state.step=0; stopDemo();
+  renderRoutes(); renderWalk(); updateGuide(); draw(); }
+
+function centerOn(s){ if(!s) return; if(state.me){ /* keep both in view */ }
+  state.view.cx=s.lat; state.view.cy=s.lng; state.view.ppm=Math.max(state.view.ppm,1.4); draw(); }
+
+/* ---------------------------------------------------------------- guidance */
+function updateGuide(){
+  const g=$("#guide"), tgt=currentTarget();
+  if(!tgt){ g.classList.remove("on"); return; }
+  g.classList.add("on");
+  $("#g-next").style.display = state.route ? "" : "none";
+  $("#g-name").textContent = tgt.name;
+  if(!state.me){ $("#g-sub").innerHTML = "Waiting for GPS — tap <b>📍 Locate</b>, or tap the map to set your spot."; setArrow(null); return; }
+  const d=distM(state.me,tgt), b=bearing(state.me,tgt);
+  if(d<25){ $("#g-sub").innerHTML = "🎉 <b>You've arrived.</b> " + (state.route?"Tap Next › for the next stop.":(tgt.tip||"")); }
+  else { $("#g-sub").innerHTML = `<b>${fmtDist(d)}</b> · ~${walkMin(d)} min · head <b>${compass(b)}</b>`; }
+  setArrow(b);
+}
+function setArrow(b){ const a=$("#arrow"); if(b==null||!state.me){ a.style.transform="rotate(0deg)"; return; }
+  const rel = state.heading!=null ? (b-state.heading+360)%360 : b; a.style.transform=`rotate(${rel}deg)`; }
+
+/* -------------------------------------------------------------------- GPS */
+let watchId=null, pulseTimer=null;
+const inIframe = (()=>{ try { return window.self!==window.top; } catch(_){ return true; } })();
+
+/* User-gesture entry point: ask for permission, then track continuously. */
+function requestLocation(){
+  // iOS 13+ needs a gesture to request compass access too.
+  if(typeof DeviceOrientationEvent!=="undefined" && typeof DeviceOrientationEvent.requestPermission==="function")
+    DeviceOrientationEvent.requestPermission().catch(()=>{});
+  requestHeading();
+  state.follow=true; setFollowUI(true); setPlaceMode(false);
+  if(!("geolocation" in navigator)){ showBanner("no-api"); return; }
+  banner(false);
+  toast("Requesting location…");
+  // getCurrentPosition reliably surfaces the browser's permission prompt.
+  navigator.geolocation.getCurrentPosition(onPos, onGeoErr, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+  startWatch();
+}
+function startWatch(){
+  if(watchId!=null) return;
+  try{
+    watchId=navigator.geolocation.watchPosition(onPos, onGeoErr,
+      { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
+  }catch(_){ showBanner("blocked"); }
+}
+function onPos(pos){
+  const {latitude,longitude,accuracy,heading}=pos.coords;
+  if(typeof heading==="number" && !isNaN(heading)) state.heading=heading;
+  setMe({lat:latitude,lng:longitude,accuracy});
+}
+function onGeoErr(err){
+  // 1 = permission denied (user OR the embedding frame's policy), 2 = unavailable, 3 = timeout.
+  if(err.code===1){ showBanner("blocked"); }
+  else if(!state.me){ toast(err.code===3?"GPS is taking a while… still trying.":"Location unavailable — move to open sky.", 3600); }
+}
+function setMe(m){
+  const first=!state.me; state.me=m;
+  if(state.follow){ state.view.cx=m.lat; state.view.cy=m.lng; if(state.view.ppm<1.4) state.view.ppm=1.7; }
+  if(first){ toast("Location found ✓"); setFollowUI(true); }
+  banner(false); startPulse(); updateGuide(); draw();
+  if(activeTab()==="shops") renderShops();
+}
+
+/* live pulse so the dot is obviously tracking while walking */
+function startPulse(){ if(pulseTimer) return; pulseTimer=setInterval(()=>{ state.pulse=(state.pulse+0.045)%1; draw(); }, 70); }
+function stopPulse(){ if(pulseTimer){ clearInterval(pulseTimer); pulseTimer=null; } state.pulse=0; }
+
+function setFollowUI(on){ $("#btn-locate").classList.toggle("following",on && !!state.me); }
+function setPlaceMode(on){ state.placeMode=on; $("#placehint").classList.toggle("on",on); }
+
+/* Banner ------------------------------------------------------------------ */
+function banner(on){ $("#locbanner").classList.toggle("on",on); }
+function showBanner(kind){
+  const tab=$("#lb-tab");
+  tab.style.display = (kind==="blocked" && inIframe) ? "" : "none";
+  if(kind==="no-api"){
+    $("#lb-title").textContent="📍 GPS unavailable";
+    $("#lb-msg").textContent="This browser can't provide location. Tap the map to set your spot, or run a Demo walk.";
+  } else if(kind==="blocked"){
+    $("#lb-title").textContent="📍 Location is blocked";
+    $("#lb-msg").innerHTML = inIframe
+      ? "No prompt appeared — the embedded view is blocking GPS. <b>Open in a new tab</b> to allow it, or set your spot on the map."
+      : "Location permission is denied. Enable it for this site in your browser's address-bar settings, then tap Enable GPS again.";
+  } else {
+    $("#lb-title").textContent="📍 Show my location";
+    $("#lb-msg").textContent="Turn on GPS to see your dot and have the map follow you as you walk.";
+  }
+  banner(true);
+}
+
+function requestHeading(){
+  function h(e){ let v=null;
+    if(typeof e.webkitCompassHeading==="number") v=e.webkitCompassHeading;
+    else if(e.absolute && typeof e.alpha==="number") v=360-e.alpha;
+    if(v!=null && !isNaN(v)){ state.heading=v; setArrow(currentTarget()&&state.me?bearing(state.me,currentTarget()):null); draw(); } }
+  window.addEventListener("deviceorientationabsolute",h,true);
+  window.addEventListener("deviceorientation",h,true);
+}
+
+/* Demo walk — animate along the active route so the app is usable without GPS */
+function startDemo(){
+  const r=state.route; if(!r){ toast("Start a route first, then Demo walk."); return; }
+  stopDemo(); state.step=0; state.follow=true; banner(false); updateGuide();
+  const legPts=r.stops.map(id=>BY_ID[id]); let i=0, t=0;
+  state.demo=setInterval(()=>{
+    const a=legPts[i], b=legPts[i+1]; if(!b){ stopDemo(); toast("Demo finished."); return; }
+    t+=0.06; const lat=a.lat+(b.lat-a.lat)*t, lng=a.lng+(b.lng-a.lng)*t;
+    state.heading=bearing(a,b); setMe({lat,lng,accuracy:8});
+    if(t>=1){ t=0; i++; state.step=Math.min(i,r.stops.length-1); renderWalk(); }
+  },200);
+  toast("Demo walk running…");
+}
+function stopDemo(){ if(state.demo){ clearInterval(state.demo); state.demo=null; } }
+
+/* ---------------------------------------------------------------- POI card */
+function openPoi(s){ const c=CATEGORIES[s.category];
+  $("#poi-cat").textContent=c.label; $("#poi-cat").style.color=c.color;
+  $("#poi-name").textContent=s.name; $("#poi-jp").textContent=s.jp||"";
+  $("#poi-d").textContent=s.desc||"";
+  $("#poi-hrs").innerHTML = s.hours?("🕑 "+s.hours):"";
+  $("#poi-tip").innerHTML = s.tip?("💡 "+s.tip):"";
+  const web=$("#poi-web"); if(s.website){ web.style.display=""; web.onclick=()=>window.open(s.website,"_blank","noopener"); } else web.style.display="none";
+  $("#poi-go").onclick=()=>targetSpot(s.id);
+  $("#poi").classList.add("on");
+}
+function closePoi(){ $("#poi").classList.remove("on"); }
+$("#poi-close").onclick=closePoi;
+
+/* ------------------------------------------------------------------- lists */
+function renderRoutes(){
+  $("#p-routes").innerHTML = ROUTES.map(r=>{
+    const on = state.route && state.route.id===r.id;
+    const path = r.stops.map(id=>BY_ID[id].name).join(" → ");
+    return `<div class="route ${on?"active":""}" data-route="${r.id}">
+      <h3>${r.emoji} ${r.name}</h3>
+      <div class="meta">${r.stops.length} STOPS · ~${r.min} MIN</div>
+      <p>${r.blurb}</p><p class="path">${path}</p>
+      <span class="start">${on?"Restart ↻":"Start route ▶"}</span></div>`;
+  }).join("");
+  $("#p-routes").querySelectorAll("[data-route]").forEach(el=>el.onclick=()=>startRoute(el.dataset.route));
+}
+
+function renderFilters(){
+  $("#filters").innerHTML = Object.entries(CATEGORIES).map(([k,c])=>
+    `<button class="chip ${state.filters.has(k)?"on":""}" data-cat="${k}">
+       <span class="dot" style="background:${c.color}"></span>${c.label}</button>`).join("");
+  $("#filters").querySelectorAll("[data-cat]").forEach(ch=>ch.onclick=()=>{
+    const k=ch.dataset.cat; state.filters.has(k)?state.filters.delete(k):state.filters.add(k);
+    renderFilters(); renderShops(); draw(); });
+}
+
+function visibleShops(){
+  let list=SPOTS.filter(s=>state.filters.has(s.category));
+  if(state.query){ const q=state.query.toLowerCase();
+    list=list.filter(s=>s.name.toLowerCase().includes(q)||(s.jp||"").includes(state.query)); }
+  if(state.me) list=list.map(s=>({...s,_d:distM(state.me,s)})).sort((a,b)=>a._d-b._d);
+  return list;
+}
+function renderShops(){
+  const list=visibleShops(); $("#shops-count").textContent="· "+list.length;
+  const el=$("#shoplist");
+  if(!list.length){ el.innerHTML='<div class="empty">No shops match.</div>'; return; }
+  el.innerHTML=list.map(s=>{ const c=CATEGORIES[s.category];
+    const dist=s._d!=null?`<div class="idist">${fmtDist(s._d)}<small>${walkMin(s._d)} min</small></div>`:"";
+    return `<div class="item" data-spot="${s.id}">
+      <div class="badge" style="background:${c.color}">${c.icon}</div>
+      <div class="imain"><h4>${s.name}</h4><div class="jp">${s.jp||""} · ${c.label}</div>
+        <div class="d">${s.desc||""}</div>${s.hours?`<div class="hrs">🕑 ${s.hours}</div>`:""}
+        <span class="go" data-go="${s.id}">Guide me here →</span></div>${dist}</div>`;
+  }).join("");
+  el.querySelectorAll(".item").forEach(it=>{ const id=it.dataset.spot;
+    it.onclick=ev=>{ if(ev.target.dataset.go){ targetSpot(id); return; } openPoi(BY_ID[id]); centerOn(BY_ID[id]); }; });
+}
+
+function renderWalk(){
+  const el=$("#p-walk");
+  if(!state.route && !state.target){ el.innerHTML=`<div class="empty">No active walk.<br>Pick a route from <b>Routes</b>, or tap a shop's <b>Guide me here</b>.</div>`; return; }
+  const stops = state.route ? state.route.stops : [state.target];
+  const title = state.route ? state.route.name : "Single destination";
+  const steps = stops.map((id,i)=>{ const s=BY_ID[id];
+    const cur = state.route ? i===state.step : true; const done = state.route && i<state.step;
+    const dist = (cur && state.me) ? `<div class="sdist">${fmtDist(distM(state.me,s))}</div>` : "";
+    return `<div class="step ${cur?"current":""} ${done?"done":""}" data-jump="${i}">
+      <div class="snum">${done?"✓":i+1}</div>
+      <div class="sbody"><h4>${s.name}</h4><small>${s.jp||""} · ${CATEGORIES[s.category].label}${s.hours?" · 🕑 "+s.hours:""}</small></div>${dist}</div>`;
+  }).join("");
+  el.innerHTML = `<div class="walk-head"><h3>${title}</h3></div>
+    <div class="toolbar">
+      ${state.route?'<button class="btn primary small" id="tb-next">Next ›</button>':''}
+      <button class="btn ghost small" id="tb-demo">${state.demo?"◼ Stop demo":"▶ Demo walk"}</button>
+      <button class="btn ghost small" id="tb-fit">Fit map</button>
+      <button class="btn danger small" id="tb-stop">End</button>
+    </div>${steps}`;
+  const nb=$("#tb-next"); if(nb) nb.onclick=nextStop;
+  $("#tb-demo").onclick=()=>{ state.demo?stopDemo():startDemo(); renderWalk(); };
+  $("#tb-fit").onclick=()=>fitAll();
+  $("#tb-stop").onclick=()=>{ endRoute(); toast("Walk ended."); };
+  el.querySelectorAll("[data-jump]").forEach(row=>row.onclick=()=>{ if(!state.route) return;
+    state.step=+row.dataset.jump; renderWalk(); updateGuide(); centerOn(currentTarget()); });
+}
+
+/* ------------------------------------------------------------- sheet/tabs */
+function activeTab(){ return document.querySelector(".tab.on").dataset.tab; }
+function setTab(name){ document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.tab===name));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("on",p.dataset.panel===name));
+  if(name==="shops") renderShops(); if(name==="walk") renderWalk(); if(name==="routes") renderRoutes(); }
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setTab(t.dataset.tab));
+
+const SHEET_H = { peek:"46vh", full:"84vh", min:"84px" };
+function setSheet(k){ document.documentElement.style.setProperty("--sheet", SHEET_H[k]);
+  setTimeout(()=>{ resize(); },290); }
+function peekSheet(){ setSheet("peek"); }
+let sheetIdx=0; const order=["peek","full","min"];
+$("#grip").onclick=()=>{ sheetIdx=(sheetIdx+1)%order.length; setSheet(order[sheetIdx]); };
+(function dragSheet(){ const grip=$("#grip"); let y0=0,on=false;
+  const s=y=>{on=true;y0=y;}, e=y=>{ if(!on)return; on=false; const dy=y-y0;
+    if(dy<-40){setSheet("full");sheetIdx=1;} else if(dy>40){setSheet("min");sheetIdx=2;} };
+  grip.addEventListener("touchstart",ev=>s(ev.touches[0].clientY),{passive:true});
+  grip.addEventListener("touchend",ev=>e(ev.changedTouches[0].clientY));
+  grip.addEventListener("mousedown",ev=>s(ev.clientY)); window.addEventListener("mouseup",ev=>on&&e(ev.clientY));
+})();
+
+/* --------------------------------------------------------------- controls */
+$("#btn-locate").onclick=()=>{
+  if(state.me){ // already tracking → re-enable follow and recenter
+    state.follow=true; setFollowUI(true);
+    state.view.cx=state.me.lat; state.view.cy=state.me.lng; state.view.ppm=Math.max(state.view.ppm,1.7); draw();
+  } else requestLocation();
+};
+$("#lb-enable").onclick=requestLocation;
+$("#lb-map").onclick=()=>{ banner(false); setPlaceMode(true); toast("Tap the map to drop your location."); };
+$("#lb-x").onclick=()=>banner(false);
+$("#lb-tab").onclick=()=>{ try{ window.open(location.href,"_blank","noopener"); }catch(_){ toast("Open this page's URL in a new browser tab."); } };
+$("#ctl-in").onclick=()=>zoomAt(W/2,H/2,1.25);
+$("#ctl-out").onclick=()=>zoomAt(W/2,H/2,0.8);
+$("#ctl-fit").onclick=()=>fitAll();
+$("#search").addEventListener("input",e=>{ state.query=e.target.value.trim(); renderShops(); });
+
+/* theme toggle */
+$("#btn-theme").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const next = cur==="dark" ? "light" : cur==="light" ? "dark"
+    : (matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme",next); draw();
+};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw);
+
+/* optional live OSM data (works when hosted with internet; harmless offline) */
+if(window.OSM_SHOPS && Array.isArray(window.OSM_SHOPS)){
+  window.OSM_SHOPS.forEach(s=>{ if(!BY_ID[s.id]){ SPOTS.push(s); BY_ID[s.id]=s; } });
+}
+
+/* ------------------------------------------------------------------- boot */
+window.addEventListener("resize",()=>{ clearTimeout(window._rz); window._rz=setTimeout(resize,120); });
+new ResizeObserver(()=>resize()).observe(canvas);
+renderRoutes(); renderFilters(); renderShops(); renderWalk();
+setSheet("peek");
+requestAnimationFrame(()=>{ resize(); fitAll(); });
+
+/* Preflight: if permission was already granted, start tracking silently;
+   otherwise show the Enable-GPS banner and wait for a tap (a gesture makes
+   the browser prompt reliable, especially inside an embedded frame). */
+(function preflight(){
+  if(!("geolocation" in navigator)){ showBanner("no-api"); return; }
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({name:"geolocation"}).then(st=>{
+      if(st.state==="granted"){ state.follow=true; setFollowUI(true); requestHeading(); startWatch();
+        navigator.geolocation.getCurrentPosition(onPos, onGeoErr, {enableHighAccuracy:true,timeout:15000,maximumAge:0}); }
+      else if(st.state==="denied"){ showBanner("blocked"); }
+      else { showBanner("prompt"); }
+      st.onchange=()=>{ if(st.state==="granted") requestLocation(); };
+    }).catch(()=>showBanner("prompt"));
+  } else { showBanner("prompt"); }
+})();
+</script>
